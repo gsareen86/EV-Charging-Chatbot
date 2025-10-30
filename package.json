@@ -1,0 +1,19 @@
+{
+  "name": "ev-charging-chatbot",
+  "version": "1.0.0",
+  "description": "An AI-powered voice chatbot for electric vehicle charging stations, designed to assist hypermarket delivery personnel (HDP) with queries about battery charging and swapping services across India.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:29810/git/gsareen86/EV-Charging-Chatbot"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "livekit-client": "^2.5.7"
+  }
+}
