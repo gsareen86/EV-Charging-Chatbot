@@ -1,116 +1,161 @@
 """
-Flask server for EV Charging Chatbot
+FastAPI server for EV Charging Chatbot
 Handles token generation and serves the frontend
 """
 import os
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
+from pathlib import Path
+from typing import List
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from livekit import api
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__, static_folder='../frontend')
-CORS(app)
-
 # LiveKit configuration
 LIVEKIT_API_KEY = os.getenv('LIVEKIT_API_KEY', 'devkey')
 LIVEKIT_API_SECRET = os.getenv('LIVEKIT_API_SECRET', 'secret')
 LIVEKIT_URL = os.getenv('LIVEKIT_URL', 'ws://localhost:7880')
 
+# Initialize FastAPI app
+app = FastAPI(
+    title="EV Charging Voice Chatbot API",
+    description="API for EV charging voice assistant with LiveKit integration",
+    version="1.0.0"
+)
 
-@app.route('/')
-def index():
-    """Serve the main HTML page"""
-    return send_from_directory('../frontend', 'index.html')
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify allowed origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Get frontend directory
+FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 
-@app.route('/<path:path>')
-def serve_static(path):
-    """Serve static files (CSS, JS, etc.)"""
-    return send_from_directory('../frontend', path)
+# Pydantic models for request/response validation
+class TokenRequest(BaseModel):
+    roomName: str
+    participantName: str
 
 
-@app.route('/api/token', methods=['POST'])
-def generate_token():
+class TokenResponse(BaseModel):
+    token: str
+    url: str
+    roomName: str
+    participantName: str
+
+
+class HealthResponse(BaseModel):
+    status: str
+    service: str
+    livekit_url: str
+
+
+class ConfigResponse(BaseModel):
+    livekit_url: str
+    supported_languages: List[str]
+
+
+# API Endpoints
+@app.post("/api/token", response_model=TokenResponse)
+async def generate_token(request: TokenRequest):
     """
     Generate LiveKit access token for a participant
 
-    Request body:
-    {
-        "roomName": "room-name",
-        "participantName": "participant-name"
-    }
+    - **roomName**: Name of the LiveKit room
+    - **participantName**: Name of the participant joining
     """
     try:
-        data = request.get_json()
-
-        room_name = data.get('roomName')
-        participant_name = data.get('participantName')
-
-        if not room_name or not participant_name:
-            return jsonify({
-                'error': 'roomName and participantName are required'
-            }), 400
-
         # Create access token
         token = api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET) \
-            .with_identity(participant_name) \
-            .with_name(participant_name) \
+            .with_identity(request.participantName) \
+            .with_name(request.participantName) \
             .with_grants(api.VideoGrants(
                 room_join=True,
-                room=room_name,
+                room=request.roomName,
                 can_publish=True,
                 can_subscribe=True,
             ))
 
         jwt_token = token.to_jwt()
 
-        return jsonify({
-            'token': jwt_token,
-            'url': LIVEKIT_URL,
-            'roomName': room_name,
-            'participantName': participant_name
-        })
+        return TokenResponse(
+            token=jwt_token,
+            url=LIVEKIT_URL,
+            roomName=request.roomName,
+            participantName=request.participantName
+        )
 
     except Exception as e:
-        return jsonify({
-            'error': str(e)
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'service': 'EV Charging Chatbot API',
-        'livekit_url': LIVEKIT_URL
-    })
+@app.get("/api/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint to verify API status"""
+    return HealthResponse(
+        status="healthy",
+        service="EV Charging Chatbot API",
+        livekit_url=LIVEKIT_URL
+    )
 
 
-@app.route('/api/config', methods=['GET'])
-def get_config():
-    """Get public configuration"""
-    return jsonify({
-        'livekit_url': LIVEKIT_URL,
-        'supported_languages': ['en', 'hi']
-    })
+@app.get("/api/config", response_model=ConfigResponse)
+async def get_config():
+    """Get public configuration information"""
+    return ConfigResponse(
+        livekit_url=LIVEKIT_URL,
+        supported_languages=["en", "hi"]
+    )
 
 
-if __name__ == '__main__':
+# Static file serving
+@app.get("/")
+async def read_index():
+    """Serve the main HTML page"""
+    return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/{file_path:path}")
+async def serve_static(file_path: str):
+    """Serve static files (CSS, JS, etc.)"""
+    file_location = FRONTEND_DIR / file_path
+
+    if file_location.exists() and file_location.is_file():
+        return FileResponse(file_location)
+
+    # If file not found, return 404
+    raise HTTPException(status_code=404, detail="File not found")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
     # Print startup information
     print("=" * 60)
-    print("EV Charging Voice Chatbot - Flask Server")
+    print("EV Charging Voice Chatbot - FastAPI Server")
     print("=" * 60)
     print(f"LiveKit URL: {LIVEKIT_URL}")
     print(f"Server running on: http://localhost:5000")
+    print(f"API documentation: http://localhost:5000/docs")
+    print(f"Alternative API docs: http://localhost:5000/redoc")
     print("=" * 60)
 
-    # Run the server
-    app.run(
-        host='0.0.0.0',
+    # Run the server with uvicorn
+    uvicorn.run(
+        "server:app",
+        host="0.0.0.0",
         port=5000,
-        debug=True
+        reload=True,  # Auto-reload on code changes
+        log_level="info"
     )

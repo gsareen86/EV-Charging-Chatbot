@@ -19,8 +19,9 @@ scikit-learn==1.3.0
 python-dotenv==1.0.0
 
 # Web Framework (for serving UI)
-flask==3.0.0
-flask-cors==4.0.0
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
 
 # Utilities
 aiohttp==3.9.1
