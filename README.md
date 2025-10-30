@@ -81,6 +81,7 @@ The application supports both a locally hosted LiveKit server and LiveKit Cloud.
 
 - `LIVEKIT_DEPLOYMENT=local` (default) uses a local LiveKit server with the development key/secret and `ws://localhost:7880`.
 - `LIVEKIT_DEPLOYMENT=cloud` expects `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, and optionally `LIVEKIT_URL` (defaults to the project's LiveKit Cloud URL).
+- `LIVEKIT_AGENT_NAME` identifies the worker that should join calls. The backend automatically dispatches the agent to the requested room when a token is issued.
 
 When running against LiveKit Cloud, ensure the API key and secret are present; the backend will raise an error if they are missing.
 
@@ -97,6 +98,7 @@ cp .env.example .env
 #   - LIVEKIT_DEPLOYMENT (local | cloud)
 #   - LIVEKIT_URL (cloud defaults to provided LiveKit Cloud URL)
 #   - LIVEKIT_API_KEY and LIVEKIT_API_SECRET when using LiveKit Cloud
+#   - LIVEKIT_AGENT_NAME matching the worker started via `scripts/start_agent.sh`
 
 # 3. Build vector database
 ./scripts/build_db.sh

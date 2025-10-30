@@ -182,7 +182,8 @@ class EVChargingApp {
             const data = JSON.parse(decoder.decode(payload));
 
             if (data.type === 'transcription') {
-                this.addTranscript(data.text, data.isFinal, participant);
+                const roleFromPayload = data.role || (participant?.identity === this.room?.localParticipant?.identity ? 'user' : 'assistant');
+                this.addTranscript(data.text, data.isFinal, roleFromPayload, data.language);
             }
         });
 
@@ -293,12 +294,10 @@ class EVChargingApp {
         }
     }
 
-    addTranscript(text, isFinal, participant) {
-        const isUser = participant === this.room?.localParticipant;
-        const role = isUser ? 'user' : 'assistant';
+    addTranscript(text, isFinal, role, languageHint) {
+        if (!text) return;
 
-        // Detect language (simple heuristic)
-        const language = this.detectLanguage(text);
+        const language = languageHint || this.detectLanguage(text);
         this.updateLanguageIndicator(language);
 
         // Remove empty state if exists
@@ -307,43 +306,67 @@ class EVChargingApp {
             emptyState.remove();
         }
 
-        // Check if we should update the last message or create a new one
         const lastMessage = this.transcriptionContent.lastElementChild;
-        if (!isFinal && lastMessage && lastMessage.dataset.role === role) {
-            // Update existing partial transcript
+
+        if (lastMessage && lastMessage.dataset.role === role && lastMessage.dataset.final !== 'true') {
             const messageText = lastMessage.querySelector('.message-text');
             messageText.textContent = text;
-        } else if (isFinal) {
-            // Create new message
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `transcript-message ${role}`;
-            messageDiv.dataset.role = role;
 
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            if (isFinal) {
+                lastMessage.dataset.final = 'true';
+                const timeEl = lastMessage.querySelector('.message-time');
+                timeEl.textContent = this.getCurrentTimeString();
+                this.transcripts.push({
+                    role,
+                    text,
+                    timestamp: new Date(),
+                    language
+                });
+            }
 
-            messageDiv.innerHTML = `
-                <div class="message-label">${role === 'user' ? 'You' : 'Assistant'}</div>
-                <div class="message-text">${text}</div>
-                <div class="message-time">${timeString}</div>
-            `;
+            return;
+        }
 
-            this.transcriptionContent.appendChild(messageDiv);
+        const messageDiv = this.createTranscriptMessage(role, text, language, isFinal);
+        this.transcriptionContent.appendChild(messageDiv);
 
-            // Store transcript
+        if (isFinal) {
             this.transcripts.push({
                 role,
                 text,
-                timestamp: now,
+                timestamp: new Date(),
                 language
             });
-
-            // Auto-scroll to bottom
-            this.transcriptionContent.scrollTop = this.transcriptionContent.scrollHeight;
         }
+
+        // Auto-scroll to bottom
+        this.transcriptionContent.scrollTop = this.transcriptionContent.scrollHeight;
+    }
+
+    createTranscriptMessage(role, text, language, isFinal) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `transcript-message ${role}`;
+        messageDiv.dataset.role = role;
+        messageDiv.dataset.final = isFinal ? 'true' : 'false';
+        messageDiv.dataset.language = language;
+
+        const timeString = isFinal ? this.getCurrentTimeString() : '';
+
+        messageDiv.innerHTML = `
+            <div class="message-label">${role === 'user' ? 'You' : 'Assistant'}</div>
+            <div class="message-text">${text}</div>
+            <div class="message-time">${timeString}</div>
+        `;
+
+        return messageDiv;
+    }
+
+    getCurrentTimeString() {
+        const now = new Date();
+        return now.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     }
 
     detectLanguage(text) {
@@ -379,8 +402,7 @@ class EVChargingApp {
 
     // Simulate receiving transcripts (for testing without backend)
     simulateTranscript(text, role = 'assistant', language = 'en') {
-        const mockParticipant = role === 'user' ? this.room?.localParticipant : null;
-        this.addTranscript(text, true, mockParticipant);
+        this.addTranscript(text, true, role, language);
     }
 }
 
