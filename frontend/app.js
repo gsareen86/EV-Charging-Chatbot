@@ -200,15 +200,12 @@ class EVChargingApp {
 
     async setupLocalAudio() {
         try {
-            // Request microphone access
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // Ask LiveKit SDK to create and manage the microphone track.
+            // Passing capture options instead of a MediaStream avoids structuredClone errors
+            // thrown by browsers when cloning stream objects.
+            this.localAudioTrack = await LivekitClient.createLocalAudioTrack();
 
-            // Create local audio track
-            this.localAudioTrack = await LivekitClient.createLocalAudioTrack({
-                stream: stream,
-            });
-
-            // Publish the track
+            // Publish the track to the connected room
             await this.room.localParticipant.publishTrack(this.localAudioTrack);
 
             console.log('Local audio track published');
@@ -221,6 +218,14 @@ class EVChargingApp {
     }
 
     async disconnect() {
+        if (this.room && this.localAudioTrack) {
+            try {
+                await this.room.localParticipant.unpublishTrack(this.localAudioTrack);
+            } catch (error) {
+                console.warn('Unable to unpublish local audio track cleanly:', error);
+            }
+        }
+
         if (this.room) {
             await this.room.disconnect();
         }
