@@ -3,6 +3,7 @@ LiveKit-based Voice Agent for EV Charging Chatbot
 Handles STT -> LLM -> TTS pipeline with FAISS vector search
 Uses latest LiveKit Agents API with turn detection, preemptive generation, and metrics
 """
+import json
 import os
 import logging
 from typing import Optional
@@ -21,6 +22,7 @@ from livekit.agents import (
     metrics,
     llm,
 )
+from livekit.agents.voice import events as voice_events
 from livekit.plugins import noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
@@ -28,6 +30,11 @@ from vector_search import VectorSearch
 
 # Load environment variables
 load_dotenv()
+
+LIVEKIT_URL = os.getenv("LIVEKIT_URL", "ws://localhost:7880")
+LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "devkey")
+LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "secret")
+LIVEKIT_AGENT_NAME = os.getenv("LIVEKIT_AGENT_NAME", "ev-charging-assistant")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -259,6 +266,60 @@ async def entrypoint(ctx: JobContext):
             assistant.instructions = updated_instructions
             logger.info("Context injected into agent instructions")
 
+    def publish_transcript_message(
+        *,
+        role: str,
+        text: str,
+        is_final: bool,
+        language: Optional[str] = None,
+    ) -> None:
+        """Publish transcription data to room participants via the data channel."""
+
+        if not text:
+            return
+
+        if not language:
+            language = assistant.detect_language(text)
+
+        try:
+            ctx.room.local_participant.publish_data(
+                json.dumps(
+                    {
+                        "type": "transcription",
+                        "role": role,
+                        "text": text,
+                        "isFinal": is_final,
+                        "language": language,
+                    }
+                ).encode("utf-8"),
+                reliable=is_final,
+            )
+        except Exception as publish_error:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Failed to publish transcript data: %s", publish_error, exc_info=True
+            )
+
+    @session.on("user_input_transcribed")
+    def _on_user_input_transcribed(ev: voice_events.UserInputTranscribedEvent):
+        publish_transcript_message(
+            role="user",
+            text=ev.transcript,
+            is_final=ev.is_final,
+            language=ev.language,
+        )
+
+    @session.on("conversation_item_added")
+    def _on_conversation_item_added(ev: voice_events.ConversationItemAddedEvent):
+        item = ev.item
+        if not isinstance(item, llm.ChatMessage):
+            return
+
+        if item.role != "assistant":
+            return
+
+        text = item.text_content or ""
+        publish_transcript_message(role="assistant", text=text, is_final=True)
+
     # Start the session
     await session.start(
         agent=assistant,
@@ -283,5 +344,9 @@ if __name__ == "__main__":
         WorkerOptions(
             entrypoint_fnc=entrypoint,
             prewarm_fnc=prewarm,
+            agent_name=LIVEKIT_AGENT_NAME,
+            ws_url=LIVEKIT_URL,
+            api_key=LIVEKIT_API_KEY,
+            api_secret=LIVEKIT_API_SECRET,
         )
     )

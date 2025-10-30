@@ -75,6 +75,16 @@ An AI-powered voice chatbot for electric vehicle charging stations, designed to 
 2. LiveKit Server (or Docker)
 3. OpenAI API Key
 
+### LiveKit deployment modes
+
+The application supports both a locally hosted LiveKit server and LiveKit Cloud. Use the `.env` file to switch between deployments:
+
+- `LIVEKIT_DEPLOYMENT=local` (default) uses a local LiveKit server with the development key/secret and `ws://localhost:7880`.
+- `LIVEKIT_DEPLOYMENT=cloud` expects `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, and optionally `LIVEKIT_URL` (defaults to the project's LiveKit Cloud URL).
+- `LIVEKIT_AGENT_NAME` identifies the worker that should join calls. The backend automatically dispatches the agent to the requested room when a token is issued.
+
+When running against LiveKit Cloud, ensure the API key and secret are present; the backend will raise an error if they are missing.
+
 ### Installation
 
 ```bash
@@ -83,7 +93,12 @@ An AI-powered voice chatbot for electric vehicle charging stations, designed to 
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# Edit .env and add the following:
+#   - OPENAI_API_KEY
+#   - LIVEKIT_DEPLOYMENT (local | cloud)
+#   - LIVEKIT_URL (cloud defaults to provided LiveKit Cloud URL)
+#   - LIVEKIT_API_KEY and LIVEKIT_API_SECRET when using LiveKit Cloud
+#   - LIVEKIT_AGENT_NAME matching the worker started via `scripts/start_agent.sh`
 
 # 3. Build vector database
 ./scripts/build_db.sh
