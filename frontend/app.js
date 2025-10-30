@@ -1,6 +1,6 @@
 /**
  * EV Charging Voice Assistant - Frontend Application
- * Handles LiveKit connection, audio streaming, and transcription display
+ * Handles LivekitClient connection, audio streaming, and transcription display
  */
 
 class EVChargingApp {
@@ -81,8 +81,8 @@ class EVChargingApp {
             // Get access token from backend
             const token = await this.getAccessToken(roomName, participantName);
 
-            // Initialize LiveKit room
-            this.room = new LiveKit.Room({
+            // Initialize LivekitClient room
+            this.room = new LivekitClient.Room({
                 adaptiveStream: true,
                 dynacast: true,
             });
@@ -91,7 +91,7 @@ class EVChargingApp {
             this.setupRoomEventListeners();
 
             // Connect to the room
-            const livekitUrl = 'ws://localhost:7880'; // Default LiveKit URL
+            const livekitUrl = 'ws://localhost:7880'; // Default LivekitClient URL
             await this.room.connect(livekitUrl, token);
 
             // Set up local audio track
@@ -116,7 +116,7 @@ class EVChargingApp {
             if (error.message.includes('token')) {
                 alert('Failed to get access token. Please make sure the backend server is running.');
             } else if (error.message.includes('connect')) {
-                alert('Failed to connect to LiveKit server. Please ensure LiveKit is running on ws://localhost:7880');
+                alert('Failed to connect to LivekitClient server. Please ensure LivekitClient is running on ws://localhost:7880');
             }
         }
     }
@@ -153,22 +153,22 @@ class EVChargingApp {
 
     setupRoomEventListeners() {
         // Track subscribed
-        this.room.on(LiveKit.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        this.room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
             console.log('Track subscribed:', track.kind);
 
-            if (track.kind === LiveKit.Track.Kind.Audio) {
+            if (track.kind === LivekitClient.Track.Kind.Audio) {
                 const audioElement = track.attach();
                 document.body.appendChild(audioElement);
             }
         });
 
         // Track unsubscribed
-        this.room.on(LiveKit.RoomEvent.TrackUnsubscribed, (track) => {
+        this.room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
             track.detach().forEach(element => element.remove());
         });
 
         // Data received (for transcriptions)
-        this.room.on(LiveKit.RoomEvent.DataReceived, (payload, participant) => {
+        this.room.on(LivekitClient.RoomEvent.DataReceived, (payload, participant) => {
             const decoder = new TextDecoder();
             const data = JSON.parse(decoder.decode(payload));
 
@@ -178,12 +178,12 @@ class EVChargingApp {
         });
 
         // Participant connected
-        this.room.on(LiveKit.RoomEvent.ParticipantConnected, (participant) => {
+        this.room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
             console.log('Participant connected:', participant.identity);
         });
 
         // Disconnected
-        this.room.on(LiveKit.RoomEvent.Disconnected, () => {
+        this.room.on(LivekitClient.RoomEvent.Disconnected, () => {
             console.log('Disconnected from room');
             this.handleDisconnection();
         });
@@ -195,7 +195,7 @@ class EVChargingApp {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
             // Create local audio track
-            this.localAudioTrack = await LiveKit.createLocalAudioTrack({
+            this.localAudioTrack = await LivekitClient.createLocalAudioTrack({
                 stream: stream,
             });
 
@@ -372,15 +372,15 @@ class EVChargingApp {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    // Check if LiveKit is loaded
-    if (typeof LiveKit === 'undefined') {
-        console.error('LiveKit client library failed to load!');
+    // Check if LivekitClient is loaded
+    if (typeof LivekitClient === 'undefined') {
+        console.error('LivekitClient client library failed to load!');
         console.error('Please check your internet connection and try refreshing the page.');
-        alert('Error: LiveKit client library failed to load. Please check your internet connection and refresh the page.');
+        alert('Error: LivekitClient client library failed to load. Please check your internet connection and refresh the page.');
         return;
     }
 
-    console.log('LiveKit client library loaded successfully:', LiveKit);
+    console.log('LivekitClient client library loaded successfully:', LivekitClient);
     window.app = new EVChargingApp();
 
     // For debugging: expose simulate function
