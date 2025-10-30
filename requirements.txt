@@ -1,8 +1,10 @@
 # LiveKit and Voice Processing
-livekit==0.17.3
-livekit-agents==0.9.6
-livekit-plugins-openai==0.8.3
-livekit-plugins-silero==0.6.3
+livekit>=0.18.0
+livekit-agents>=0.10.0
+livekit-plugins-openai>=0.9.0
+livekit-plugins-silero>=0.7.0
+livekit-plugins-turn-detector>=0.1.0
+livekit-plugins-noise-cancellation>=0.1.0
 
 # OpenAI
 openai>=1.12.0
