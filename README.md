@@ -23,7 +23,7 @@ An AI-powered voice chatbot for electric vehicle charging stations, designed to 
          │ WebSocket (LiveKit)
          │
 ┌────────▼────────┐
-│  Flask Server   │
+│  FastAPI Server │
 │ (Token Gen)     │
 └────────┬────────┘
          │
@@ -60,7 +60,7 @@ An AI-powered voice chatbot for electric vehicle charging stations, designed to 
 - **LiveKit**: Real-time voice communication framework
 - **OpenAI API**: Whisper (STT), GPT-4o-mini (LLM), TTS
 - **FAISS**: Vector similarity search for FAQ retrieval
-- **Flask**: Web server for frontend and API
+- **FastAPI**: Modern async web framework for API and frontend serving
 
 ### Frontend
 - **HTML5/CSS3**: Structure and styling
@@ -104,7 +104,7 @@ EV-Charging-Chatbot/
 │   ├── voice_agent.py          # LiveKit voice agent
 │   ├── vector_search.py        # FAISS search
 │   ├── build_vector_db.py      # Build FAISS index
-│   └── server.py               # Flask server
+│   └── server.py               # FastAPI server
 ├── frontend/
 │   ├── index.html              # Main UI
 │   ├── styles.css              # Styling
@@ -149,7 +149,7 @@ Then rebuild: `./scripts/build_db.sh`
 
 **Connection issues?**
 - Ensure LiveKit is running: `curl http://localhost:7880`
-- Check Flask server: `curl http://localhost:5000/api/health`
+- Check FastAPI server: `curl http://localhost:5000/api/health`
 
 **No voice recognition?**
 - Grant microphone permissions in browser

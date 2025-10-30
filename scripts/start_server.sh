@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Start Flask server
+# Start FastAPI server
 # This serves the frontend and provides token generation API
 
 echo "=========================================="
-echo "Starting Flask Server"
+echo "Starting FastAPI Server"
 echo "=========================================="
 
 # Activate virtual environment
@@ -24,7 +24,8 @@ if [ ! -f ".env" ]; then
 fi
 
 # Start the server
-echo "Starting Flask server on http://localhost:5000"
+echo "Starting FastAPI server on http://localhost:5000"
+echo "API docs available at http://localhost:5000/docs"
 echo ""
 
 cd backend && python server.py
