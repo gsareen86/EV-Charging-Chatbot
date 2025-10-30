@@ -177,16 +177,19 @@ async def entrypoint(ctx: JobContext):
     assistant = VoicePipelineAgent(
         vad=silero.VAD.load(),  # Voice Activity Detection
         stt=openai.STT(
-            model="whisper-1",  # Using OpenAI Whisper for STT
+            # model="whisper-1",  # Using OpenAI Whisper for STT
+            model="gpt-4o-mini-transcribe",  # Using OpenAI gpt-4o-mini-transcribe for STT
             language=None,  # Auto-detect language
         ),
         llm=openai.LLM(
-            model="gpt-4o-mini",  # Using GPT-4o-mini as specified (gpt-5-nano not available yet)
+            # model="gpt-4o-mini",  # Using GPT-4o-mini as specified (gpt-5-nano not available yet)
+            model="gpt-5-nano-2025-08-07",  # Using GPT-5-nano
             temperature=0.7,
         ),
         tts=openai.TTS(
-            model="tts-1",  # Using OpenAI TTS
-            voice="nova",  # Nova voice - clear and professional
+            # model="tts-1",  # Using OpenAI TTS
+            model="gpt-4o-mini-tts",  # Using OpenAI gpt-4o-mini-tts
+            voice="alloy",  # Nova voice - clear and professional
         ),
         chat_ctx=initial_ctx,
         before_llm_cb=_enrich_context,  # Inject context before LLM processing
