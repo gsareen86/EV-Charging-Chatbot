@@ -79,7 +79,8 @@ class EVChargingApp {
             this.connectionInfo.innerHTML = '<p>Connecting to voice assistant...</p>';
 
             // Get access token from backend
-            const token = await this.getAccessToken(roomName, participantName);
+            const connectionConfig = await this.getAccessToken(roomName, participantName);
+            const { token, url: livekitUrl, deployment } = connectionConfig;
 
             // Initialize LivekitClient room
             this.room = new LivekitClient.Room({
@@ -91,7 +92,6 @@ class EVChargingApp {
             this.setupRoomEventListeners();
 
             // Connect to the room
-            const livekitUrl = 'ws://localhost:7880'; // Default LivekitClient URL
             await this.room.connect(livekitUrl, token);
 
             // Set up local audio track
@@ -99,7 +99,11 @@ class EVChargingApp {
 
             this.isConnected = true;
             this.updateStatus('connected', 'Connected');
-            this.connectionInfo.innerHTML = '<p>✓ Connected! Start speaking to interact with the assistant</p>';
+            this.connectionInfo.innerHTML = `
+                <p>✓ Connected! Start speaking to interact with the assistant.</p>
+                <p><strong>Deployment:</strong> ${deployment === 'cloud' ? 'LiveKit Cloud' : 'Local LiveKit Server'}</p>
+                <p><strong>Server:</strong> ${livekitUrl}</p>
+            `;
             this.waveContainer.classList.add('active');
 
             // Enable/disable buttons
@@ -116,7 +120,7 @@ class EVChargingApp {
             if (error.message.includes('token')) {
                 alert('Failed to get access token. Please make sure the backend server is running.');
             } else if (error.message.includes('connect')) {
-                alert('Failed to connect to LivekitClient server. Please ensure LivekitClient is running on ws://localhost:7880');
+                alert('Failed to connect to the LiveKit server. Please ensure the configured LiveKit deployment is reachable.');
             }
         }
     }
@@ -125,7 +129,12 @@ class EVChargingApp {
         try {
             // In production, this should call your backend API
             // For now, we'll need to use a token generated from the backend
-            const response = await fetch('http://localhost:5000/api/token', {
+            let apiBaseUrl = window.location.origin;
+            if (!apiBaseUrl.startsWith('http')) {
+                apiBaseUrl = 'http://localhost:5000';
+            }
+
+            const response = await fetch(`${apiBaseUrl}/api/token`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -141,13 +150,13 @@ class EVChargingApp {
             }
 
             const data = await response.json();
-            return data.token;
+            return data;
 
         } catch (error) {
             console.error('Token fetch error:', error);
 
             // Fallback: Show instructions to user
-            throw new Error('Cannot fetch token. Please ensure the Flask server is running on http://localhost:5000');
+            throw new Error('Cannot fetch token. Please ensure the FastAPI server is running.');
         }
     }
 
@@ -191,15 +200,12 @@ class EVChargingApp {
 
     async setupLocalAudio() {
         try {
-            // Request microphone access
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // Ask LiveKit SDK to create and manage the microphone track.
+            // Passing capture options instead of a MediaStream avoids structuredClone errors
+            // thrown by browsers when cloning stream objects.
+            this.localAudioTrack = await LivekitClient.createLocalAudioTrack();
 
-            // Create local audio track
-            this.localAudioTrack = await LivekitClient.createLocalAudioTrack({
-                stream: stream,
-            });
-
-            // Publish the track
+            // Publish the track to the connected room
             await this.room.localParticipant.publishTrack(this.localAudioTrack);
 
             console.log('Local audio track published');
@@ -212,6 +218,14 @@ class EVChargingApp {
     }
 
     async disconnect() {
+        if (this.room && this.localAudioTrack) {
+            try {
+                await this.room.localParticipant.unpublishTrack(this.localAudioTrack);
+            } catch (error) {
+                console.warn('Unable to unpublish local audio track cleanly:', error);
+            }
+        }
+
         if (this.room) {
             await this.room.disconnect();
         }
