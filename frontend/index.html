@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Charging Voice Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-section">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">
+                    <h1>EV Charging Assistant</h1>
+                    <p class="tagline">24x7 Voice Support for Delivery Personnel</p>
+                </div>
+            </div>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot" id="statusDot"></span>
+                <span class="status-text" id="statusText">Disconnected</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Voice Interface Card -->
+            <div class="voice-card">
+                <div class="wave-container" id="waveContainer">
+                    <div class="wave"></div>
+                    <div class="wave"></div>
+                    <div class="wave"></div>
+                </div>
+
+                <div class="voice-controls">
+                    <button class="btn-primary" id="connectBtn">
+                        <span class="btn-icon">🎤</span>
+                        <span class="btn-text">Connect</span>
+                    </button>
+
+                    <button class="btn-secondary" id="muteBtn" disabled>
+                        <span class="btn-icon">🔊</span>
+                        <span class="btn-text">Mute</span>
+                    </button>
+
+                    <button class="btn-danger" id="disconnectBtn" disabled>
+                        <span class="btn-icon">📞</span>
+                        <span class="btn-text">Disconnect</span>
+                    </button>
+                </div>
+
+                <div class="connection-info" id="connectionInfo">
+                    <p>Click "Connect" to start talking with the voice assistant</p>
+                </div>
+            </div>
+
+            <!-- Transcription Section -->
+            <div class="transcription-card">
+                <div class="transcription-header">
+                    <h2>Live Transcription</h2>
+                    <div class="language-indicator" id="languageIndicator">
+                        <span class="lang-badge">EN</span>
+                    </div>
+                </div>
+
+                <div class="transcription-content" id="transcriptionContent">
+                    <div class="empty-state">
+                        <div class="empty-icon">💬</div>
+                        <p>Conversation transcription will appear here</p>
+                    </div>
+                </div>
+
+                <button class="btn-clear" id="clearBtn">
+                    Clear Transcript
+                </button>
+            </div>
+
+            <!-- Features Section -->
+            <div class="features-section">
+                <div class="feature-card">
+                    <div class="feature-icon">📍</div>
+                    <h3>Station Locations</h3>
+                    <p>Find nearest charging stations</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔋</div>
+                    <h3>Battery Status</h3>
+                    <p>Check real-time availability</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⏰</div>
+                    <h3>24x7 Support</h3>
+                    <p>Always here to help</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌏</div>
+                    <h3>Multi-language</h3>
+                    <p>Hindi & English support</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Powered by AI | Optimized with LiveKit</p>
+            <p class="helpline">Helpline: 1800-XXX-XXXX</p>
+        </footer>
+    </div>
+
+    <!-- Connection Modal -->
+    <div class="modal" id="connectionModal">
+        <div class="modal-content">
+            <h2>Connect to Voice Assistant</h2>
+            <form id="connectionForm">
+                <div class="form-group">
+                    <label for="roomName">Room Name</label>
+                    <input type="text" id="roomName" placeholder="Enter room name" value="ev-charging-room" required>
+                </div>
+                <div class="form-group">
+                    <label for="participantName">Your Name</label>
+                    <input type="text" id="participantName" placeholder="Enter your name" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+                    <button type="submit" class="btn-primary">Join Call</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/livekit-client@2.0.0/dist/livekit-client.umd.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

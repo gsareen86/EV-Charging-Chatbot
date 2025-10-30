@@ -1,0 +1,162 @@
+[
+  {
+    "id": 1,
+    "category": "location",
+    "question_en": "Where is the nearest charging station?",
+    "question_hi": "निकटतम चार्जिंग स्टेशन कहाँ है?",
+    "answer_en": "You can find the nearest charging station by sharing your current location. Our stations are available in major hypermarket areas across Delhi NCR, Mumbai, Bangalore, Hyderabad, and Pune. Please provide your city or area name.",
+    "answer_hi": "आप अपना वर्तमान स्थान साझा करके निकटतम चार्जिंग स्टेशन खोज सकते हैं। हमारे स्टेशन दिल्ली एनसीआर, मुंबई, बैंगलोर, हैदराबाद और पुणे के प्रमुख हाइपरमार्केट क्षेत्रों में उपलब्ध हैं। कृपया अपना शहर या क्षेत्र का नाम बताएं।"
+  },
+  {
+    "id": 2,
+    "category": "location",
+    "question_en": "How many charging stations are there in my city?",
+    "question_hi": "मेरे शहर में कितने चार्जिंग स्टेशन हैं?",
+    "answer_en": "The number of charging stations varies by city. Delhi NCR has 45 stations, Mumbai has 38, Bangalore has 52, Hyderabad has 28, and Pune has 22 stations. Which city would you like information about?",
+    "answer_hi": "चार्जिंग स्टेशनों की संख्या शहर के अनुसार भिन्न होती है। दिल्ली एनसीआर में 45 स्टेशन हैं, मुंबई में 38, बैंगलोर में 52, हैदराबाद में 28, और पुणे में 22 स्टेशन हैं। आप किस शहर के बारे में जानकारी चाहते हैं?"
+  },
+  {
+    "id": 3,
+    "category": "availability",
+    "question_en": "Are charged batteries available right now?",
+    "question_hi": "क्या अभी चार्ज की हुई बैटरियां उपलब्ध हैं?",
+    "answer_en": "Battery availability varies by location. Please provide your station name or location, and I can check real-time availability for you. You can also check the mobile app for instant availability updates.",
+    "answer_hi": "बैटरी की उपलब्धता स्थान के अनुसार भिन्न होती है। कृपया अपने स्टेशन का नाम या स्थान प्रदान करें, और मैं आपके लिए वास्तविक समय की उपलब्धता जांच सकता हूं। आप तत्काल उपलब्धता अपडेट के लिए मोबाइल ऐप भी देख सकते हैं।"
+  },
+  {
+    "id": 4,
+    "category": "availability",
+    "question_en": "How long does it take to swap a battery?",
+    "question_hi": "बैटरी स्वैप करने में कितना समय लगता है?",
+    "answer_en": "Battery swapping takes approximately 2-3 minutes at our automated stations. The process includes verification, battery removal, installation of charged battery, and confirmation. It's designed to be faster than traditional refueling.",
+    "answer_hi": "हमारे स्वचालित स्टेशनों पर बैटरी स्वैपिंग में लगभग 2-3 मिनट लगते हैं। इस प्रक्रिया में सत्यापन, बैटरी हटाना, चार्ज की गई बैटरी की स्थापना और पुष्टि शामिल है। यह पारंपरिक ईंधन भरने से तेज़ है।"
+  },
+  {
+    "id": 5,
+    "category": "operational_hours",
+    "question_en": "What are the operational hours of charging stations?",
+    "question_hi": "चार्जिंग स्टेशन के संचालन के घंटे क्या हैं?",
+    "answer_en": "Most of our charging stations operate 24x7 to support hypermarket delivery personnel round the clock. However, some stations in residential areas operate from 6 AM to 11 PM. Please specify your preferred station for exact timings.",
+    "answer_hi": "हमारे अधिकांश चार्जिंग स्टेशन हाइपरमार्केट डिलीवरी कर्मियों को चौबीसों घंटे सहायता प्रदान करने के लिए 24x7 संचालित होते हैं। हालांकि, आवासीय क्षेत्रों में कुछ स्टेशन सुबह 6 बजे से रात 11 बजे तक संचालित होते हैं। सटीक समय के लिए कृपया अपना पसंदीदा स्टेशन निर्दिष्ट करें।"
+  },
+  {
+    "id": 6,
+    "category": "operational_hours",
+    "question_en": "Are stations open on weekends and holidays?",
+    "question_hi": "क्या स्टेशन सप्ताहांत और छुट्टियों पर खुले रहते हैं?",
+    "answer_en": "Yes, all our 24x7 stations remain operational during weekends and public holidays. Delivery services don't stop, and neither do we. Some stations may have reduced staff, but automated swapping services remain fully functional.",
+    "answer_hi": "हां, हमारे सभी 24x7 स्टेशन सप्ताहांत और सार्वजनिक छुट्टियों के दौरान भी संचालित रहते हैं। डिलीवरी सेवाएं नहीं रुकतीं, और हम भी नहीं रुकते। कुछ स्टेशनों पर कम स्टाफ हो सकता है, लेकिन स्वचालित स्वैपिंग सेवाएं पूरी तरह कार्यात्मक रहती हैं।"
+  },
+  {
+    "id": 7,
+    "category": "battery_swapping",
+    "question_en": "My battery is not getting detected at the swapping station",
+    "question_hi": "स्वैपिंग स्टेशन पर मेरी बैटरी का पता नहीं चल रहा है",
+    "answer_en": "If your battery is not being detected, please try the following: 1) Ensure the battery is properly seated in the vehicle, 2) Check if the battery terminals are clean, 3) Restart the swapping process, 4) If the issue persists, please contact the station attendant or call our helpline at 1800-XXX-XXXX.",
+    "answer_hi": "यदि आपकी बैटरी का पता नहीं चल रहा है, तो कृपया निम्नलिखित प्रयास करें: 1) सुनिश्चित करें कि बैटरी वाहन में ठीक से लगी हुई है, 2) जांचें कि बैटरी टर्मिनल साफ हैं या नहीं, 3) स्वैपिंग प्रक्रिया को पुनः शुरू करें, 4) यदि समस्या बनी रहती है, तो कृपया स्टेशन परिचारक से संपर्क करें या हमारी हेल्पलाइन 1800-XXX-XXXX पर कॉल करें।"
+  },
+  {
+    "id": 8,
+    "category": "battery_swapping",
+    "question_en": "The swapped battery is showing low charge",
+    "question_hi": "स्वैप की गई बैटरी कम चार्ज दिखा रही है",
+    "answer_en": "All swapped batteries should have at least 95% charge. If you received a battery showing less than 90% charge, please return to the station immediately. We will swap it with a fully charged battery at no additional cost. Please note the station name and time for our records.",
+    "answer_hi": "सभी स्वैप की गई बैटरियों में कम से कम 95% चार्ज होना चाहिए। यदि आपको 90% से कम चार्ज दिखाने वाली बैटरी मिली है, तो कृपया तुरंत स्टेशन पर वापस आएं। हम इसे बिना किसी अतिरिक्त लागत के पूरी तरह से चार्ज की गई बैटरी से स्वैप कर देंगे। कृपया हमारे रिकॉर्ड के लिए स्टेशन का नाम और समय नोट करें।"
+  },
+  {
+    "id": 9,
+    "category": "battery_swapping",
+    "question_en": "What should I do if the swapping machine is not working?",
+    "question_hi": "यदि स्वैपिंग मशीन काम नहीं कर रही है तो मुझे क्या करना चाहिए?",
+    "answer_en": "If the swapping machine is not working: 1) Check for any error messages on the screen, 2) Try using another swapping bay if available at the same station, 3) Contact the station attendant, 4) Use our app to report the issue and find the nearest alternative station, 5) Call our 24x7 helpline for immediate assistance.",
+    "answer_hi": "यदि स्वैपिंग मशीन काम नहीं कर रही है: 1) स्क्रीन पर किसी भी त्रुटि संदेश की जांच करें, 2) यदि उसी स्टेशन पर उपलब्ध हो तो दूसरी स्वैपिंग बे का उपयोग करने का प्रयास करें, 3) स्टेशन परिचारक से संपर्क करें, 4) समस्या की रिपोर्ट करने और निकटतम वैकल्पिक स्टेशन खोजने के लिए हमारे ऐप का उपयोग करें, 5) तत्काल सहायता के लिए हमारी 24x7 हेल्पलाइन पर कॉल करें।"
+  },
+  {
+    "id": 10,
+    "category": "kyc_security",
+    "question_en": "How do I complete my KYC verification?",
+    "question_hi": "मैं अपना KYC सत्यापन कैसे पूरा करूं?",
+    "answer_en": "To complete KYC verification: 1) Download our mobile app, 2) Go to Profile > KYC Verification, 3) Upload your Aadhaar card and driving license, 4) Take a live selfie for verification, 5) Submit the form. Verification typically takes 24-48 hours. You'll receive a confirmation SMS and email once approved.",
+    "answer_hi": "KYC सत्यापन पूरा करने के लिए: 1) हमारा मोबाइल ऐप डाउनलोड करें, 2) प्रोफाइल > KYC सत्यापन पर जाएं, 3) अपना आधार कार्ड और ड्राइविंग लाइसेंस अपलोड करें, 4) सत्यापन के लिए एक लाइव सेल्फी लें, 5) फॉर्म जमा करें। सत्यापन में आमतौर पर 24-48 घंटे लगते हैं। स्वीकृत होने पर आपको एक पुष्टिकरण एसएमएस और ईमेल प्राप्त होगा।"
+  },
+  {
+    "id": 11,
+    "category": "kyc_security",
+    "question_en": "I forgot my password, how do I reset it?",
+    "question_hi": "मैं अपना पासवर्ड भूल गया, मैं इसे कैसे रीसेट करूं?",
+    "answer_en": "To reset your password: 1) Open the app or website, 2) Click on 'Forgot Password' on the login screen, 3) Enter your registered mobile number, 4) You'll receive an OTP via SMS, 5) Enter the OTP and create a new password. Make sure your new password is at least 8 characters with a mix of letters, numbers, and special characters.",
+    "answer_hi": "अपना पासवर्ड रीसेट करने के लिए: 1) ऐप या वेबसाइट खोलें, 2) लॉगिन स्क्रीन पर 'पासवर्ड भूल गए' पर क्लिक करें, 3) अपना पंजीकृत मोबाइल नंबर दर्ज करें, 4) आपको एसएमएस के माध्यम से एक OTP प्राप्त होगा, 5) OTP दर्ज करें और एक नया पासवर्ड बनाएं। सुनिश्चित करें कि आपका नया पासवर्ड अक्षरों, संख्याओं और विशेष वर्णों के मिश्रण के साथ कम से कम 8 वर्णों का है।"
+  },
+  {
+    "id": 12,
+    "category": "kyc_security",
+    "question_en": "How does the QR code scanning work for battery swapping?",
+    "question_hi": "बैटरी स्वैपिंग के लिए QR कोड स्कैनिंग कैसे काम करती है?",
+    "answer_en": "QR code scanning process: 1) Open the app and click on 'Swap Battery', 2) Scan the QR code displayed on the swapping station screen, 3) The app will authenticate your identity and check your subscription status, 4) The machine will initiate the swapping process, 5) You'll receive a confirmation notification once complete. Keep your QR code secure and don't share it with others.",
+    "answer_hi": "QR कोड स्कैनिंग प्रक्रिया: 1) ऐप खोलें और 'बैटरी स्वैप करें' पर क्लिक करें, 2) स्वैपिंग स्टेशन स्क्रीन पर प्रदर्शित QR कोड को स्कैन करें, 3) ऐप आपकी पहचान को प्रमाणित करेगा और आपकी सदस्यता स्थिति की जांच करेगा, 4) मशीन स्वैपिंग प्रक्रिया शुरू करेगी, 5) पूर्ण होने पर आपको एक पुष्टिकरण सूचना प्राप्त होगी। अपना QR कोड सुरक्षित रखें और इसे दूसरों के साथ साझा न करें।"
+  },
+  {
+    "id": 13,
+    "category": "kyc_security",
+    "question_en": "Is my personal information secure?",
+    "question_hi": "क्या मेरी व्यक्तिगत जानकारी सुरक्षित है?",
+    "answer_en": "Yes, your personal information is completely secure. We use bank-grade 256-bit encryption for all data transmission and storage. Your KYC documents are stored in encrypted format and accessed only by authorized personnel. We comply with Indian data protection laws and never share your information with third parties without consent.",
+    "answer_hi": "हां, आपकी व्यक्तिगत जानकारी पूरी तरह से सुरक्षित है। हम सभी डेटा संचरण और भंडारण के लिए बैंक-ग्रेड 256-बिट एन्क्रिप्शन का उपयोग करते हैं। आपके KYC दस्तावेज़ एन्क्रिप्टेड प्रारूप में संग्रहीत किए जाते हैं और केवल अधिकृत कर्मियों द्वारा एक्सेस किए जाते हैं। हम भारतीय डेटा संरक्षण कानूनों का पालन करते हैं और आपकी सहमति के बिना आपकी जानकारी तीसरे पक्ष के साथ कभी साझा नहीं करते हैं।"
+  },
+  {
+    "id": 14,
+    "category": "subscription_pricing",
+    "question_en": "What are the subscription plans available?",
+    "question_hi": "कौन-कौन से सदस्यता योजनाएं उपलब्ध हैं?",
+    "answer_en": "We offer three subscription plans: 1) Basic Plan - Rs. 2,999/month with 60 swaps, 2) Standard Plan - Rs. 4,999/month with 100 swaps, 3) Premium Plan - Rs. 7,999/month with unlimited swaps. All plans include 24x7 customer support and access to all stations. Corporate plans are also available for fleet operators.",
+    "answer_hi": "हम तीन सदस्यता योजनाएं प्रदान करते हैं: 1) बेसिक प्लान - रु. 2,999/माह 60 स्वैप के साथ, 2) स्टैंडर्ड प्लान - रु. 4,999/माह 100 स्वैप के साथ, 3) प्रीमियम प्लान - रु. 7,999/माह असीमित स्वैप के साथ। सभी योजनाओं में 24x7 ग्राहक सहायता और सभी स्टेशनों तक पहुंच शामिल है। बेड़े संचालकों के लिए कॉर्पोरेट योजनाएं भी उपलब्ध हैं।"
+  },
+  {
+    "id": 15,
+    "category": "subscription_pricing",
+    "question_en": "What happens if I exceed my monthly swap limit?",
+    "question_hi": "यदि मैं अपनी मासिक स्वैप सीमा से अधिक हो जाऊं तो क्या होगा?",
+    "answer_en": "If you exceed your monthly swap limit: 1) You'll be charged Rs. 75 per additional swap for Basic and Standard plans, 2) Premium plan has unlimited swaps so no extra charges, 3) You can upgrade your plan mid-month and pay only the pro-rated difference, 4) Unused swaps don't roll over to the next month.",
+    "answer_hi": "यदि आप अपनी मासिक स्वैप सीमा से अधिक हो जाते हैं: 1) बेसिक और स्टैंडर्ड योजनाओं के लिए आपसे प्रति अतिरिक्त स्वैप रु. 75 का शुल्क लिया जाएगा, 2) प्रीमियम योजना में असीमित स्वैप हैं इसलिए कोई अतिरिक्त शुल्क नहीं, 3) आप महीने के बीच में अपनी योजना को अपग्रेड कर सकते हैं और केवल आनुपातिक अंतर का भुगतान कर सकते हैं, 4) अप्रयुक्त स्वैप अगले महीने में स्थानांतरित नहीं होते हैं।"
+  },
+  {
+    "id": 16,
+    "category": "technical_issues",
+    "question_en": "The mobile app is not working properly",
+    "question_hi": "मोबाइल ऐप ठीक से काम नहीं कर रहा है",
+    "answer_en": "If the app is not working: 1) Check your internet connection, 2) Update the app to the latest version from Play Store or App Store, 3) Clear app cache from phone settings, 4) Restart your phone, 5) If the issue persists, uninstall and reinstall the app. For continued problems, contact our tech support at support@evcharging.com with your device details.",
+    "answer_hi": "यदि ऐप काम नहीं कर रहा है: 1) अपने इंटरनेट कनेक्शन की जांच करें, 2) Play Store या App Store से ऐप को नवीनतम संस्करण में अपडेट करें, 3) फोन सेटिंग्स से ऐप कैश साफ़ करें, 4) अपने फोन को पुनः प्रारंभ करें, 5) यदि समस्या बनी रहती है, तो ऐप को अनइंस्टॉल और पुनः इंस्टॉल करें। निरंतर समस्याओं के लिए, अपने डिवाइस विवरण के साथ support@evcharging.com पर हमारे तकनीकी सहायता से संपर्क करें।"
+  },
+  {
+    "id": 17,
+    "category": "technical_issues",
+    "question_en": "I am not receiving OTP for login",
+    "question_hi": "मुझे लॉगिन के लिए OTP प्राप्त नहीं हो रहा है",
+    "answer_en": "If you're not receiving OTP: 1) Check if your phone number is correct, 2) Ensure you have network coverage, 3) Wait for 2-3 minutes as there might be SMS delays, 4) Check if any SMS blocking apps are active, 5) Try 'Resend OTP' option, 6) If still not received, contact customer care and we can verify you through alternate methods.",
+    "answer_hi": "यदि आपको OTP प्राप्त नहीं हो रहा है: 1) जांचें कि क्या आपका फोन नंबर सही है, 2) सुनिश्चित करें कि आपके पास नेटवर्क कवरेज है, 3) 2-3 मिनट प्रतीक्षा करें क्योंकि SMS में देरी हो सकती है, 4) जांचें कि क्या कोई SMS ब्लॉकिंग ऐप सक्रिय है, 5) 'OTP पुनः भेजें' विकल्प आजमाएं, 6) यदि फिर भी प्राप्त नहीं होता है, तो ग्राहक सेवा से संपर्क करें और हम आपको वैकल्पिक तरीकों से सत्यापित कर सकते हैं।"
+  },
+  {
+    "id": 18,
+    "category": "payment_billing",
+    "question_en": "What payment methods are accepted?",
+    "question_hi": "कौन से भुगतान तरीके स्वीकार किए जाते हैं?",
+    "answer_en": "We accept multiple payment methods: 1) UPI (Google Pay, PhonePe, Paytm, etc.), 2) Credit/Debit Cards (Visa, Mastercard, RuPay), 3) Net Banking, 4) Digital Wallets (Paytm, Amazon Pay), 5) Auto-debit for subscriptions. All payments are processed through secure payment gateways with PCI-DSS compliance.",
+    "answer_hi": "हम कई भुगतान विधियां स्वीकार करते हैं: 1) UPI (Google Pay, PhonePe, Paytm, आदि), 2) क्रेडिट/डेबिट कार्ड (Visa, Mastercard, RuPay), 3) नेट बैंकिंग, 4) डिजिटल वॉलेट (Paytm, Amazon Pay), 5) सदस्यता के लिए ऑटो-डेबिट। सभी भुगतान PCI-DSS अनुपालन के साथ सुरक्षित भुगतान गेटवे के माध्यम से संसाधित किए जाते हैं।"
+  },
+  {
+    "id": 19,
+    "category": "payment_billing",
+    "question_en": "I was charged twice for the same transaction",
+    "question_hi": "मुझे एक ही लेन-देन के लिए दो बार चार्ज किया गया",
+    "answer_en": "We apologize for the inconvenience. For double charging: 1) Check if both amounts are debited from your account, 2) Take screenshots of both transactions, 3) Raise a ticket through the app or email us at billing@evcharging.com with transaction details, 4) We'll investigate and process a refund within 5-7 business days if confirmed. You'll receive email updates on the refund status.",
+    "answer_hi": "असुविधा के लिए हम क्षमा चाहते हैं। दोहरे शुल्क के लिए: 1) जांचें कि क्या आपके खाते से दोनों राशियां डेबिट हुई हैं, 2) दोनों लेन-देन के स्क्रीनशॉट लें, 3) ऐप के माध्यम से एक टिकट बढ़ाएं या लेन-देन विवरण के साथ billing@evcharging.com पर हमें ईमेल करें, 4) हम जांच करेंगे और यदि पुष्टि हो जाती है तो 5-7 व्यावसायिक दिनों के भीतर रिफंड प्रोसेस करेंगे। आपको रिफंड स्थिति पर ईमेल अपडेट प्राप्त होंगे।"
+  },
+  {
+    "id": 20,
+    "category": "general_support",
+    "question_en": "How do I contact customer support?",
+    "question_hi": "मैं ग्राहक सहायता से कैसे संपर्क करूं?",
+    "answer_en": "You can reach our customer support through: 1) 24x7 Helpline: 1800-XXX-XXXX (toll-free), 2) Email: support@evcharging.com, 3) In-app chat support, 4) WhatsApp: +91-XXXXX-XXXXX, 5) Station attendant at any charging location. Average response time is under 5 minutes for calls and chats, 2 hours for emails.",
+    "answer_hi": "आप हमारी ग्राहक सहायता से संपर्क कर सकते हैं: 1) 24x7 हेल्पलाइन: 1800-XXX-XXXX (टोल-फ्री), 2) ईमेल: support@evcharging.com, 3) ऐप में चैट सहायता, 4) WhatsApp: +91-XXXXX-XXXXX, 5) किसी भी चार्जिंग स्थान पर स्टेशन परिचारक। कॉल और चैट के लिए औसत प्रतिक्रिया समय 5 मिनट से कम है, ईमेल के लिए 2 घंटे।"
+  }
+]
