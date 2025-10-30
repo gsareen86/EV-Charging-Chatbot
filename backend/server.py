@@ -123,7 +123,14 @@ async def get_config():
 @app.get("/")
 async def read_index():
     """Serve the main HTML page"""
-    return FileResponse(FRONTEND_DIR / "index.html")
+    return FileResponse(
+        FRONTEND_DIR / "index.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
 
 
 @app.get("/{file_path:path}")
@@ -132,7 +139,14 @@ async def serve_static(file_path: str):
     file_location = FRONTEND_DIR / file_path
 
     if file_location.exists() and file_location.is_file():
-        return FileResponse(file_location)
+        return FileResponse(
+            file_location,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
 
     # If file not found, return 404
     raise HTTPException(status_code=404, detail="File not found")

@@ -133,7 +133,18 @@
     </div>
 
     <!-- Scripts -->
-    <script src="https://unpkg.com/livekit-client@2.5.7/dist/livekit-client.umd.min.js"></script>
-    <script src="app.js"></script>
+    <!-- Try multiple CDN sources for LiveKit client -->
+    <script src="https://unpkg.com/livekit-client@2.5.7/dist/livekit-client.umd.min.js"
+            onerror="console.error('Failed to load from unpkg'); this.onerror=null; this.src='https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js'"></script>
+    <script>
+        // Debug: Log what's available in global scope
+        window.addEventListener('load', () => {
+            console.log('Checking for LiveKit in global scope...');
+            console.log('window.LiveKit:', window.LiveKit);
+            console.log('window.LiveKitClient:', window.LiveKitClient);
+            console.log('All global LiveKit-related objects:', Object.keys(window).filter(key => key.includes('iveKit') || key.includes('livekit')));
+        });
+    </script>
+    <script src="app.js?v=2.2"></script>
 </body>
 </html>
