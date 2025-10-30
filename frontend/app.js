@@ -372,6 +372,15 @@ class EVChargingApp {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    // Check if LiveKit is loaded
+    if (typeof LiveKit === 'undefined') {
+        console.error('LiveKit client library failed to load!');
+        console.error('Please check your internet connection and try refreshing the page.');
+        alert('Error: LiveKit client library failed to load. Please check your internet connection and refresh the page.');
+        return;
+    }
+
+    console.log('LiveKit client library loaded successfully:', LiveKit);
     window.app = new EVChargingApp();
 
     // For debugging: expose simulate function
