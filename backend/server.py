@@ -18,9 +18,25 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # LiveKit configuration
-LIVEKIT_API_KEY = os.getenv('LIVEKIT_API_KEY', 'devkey')
-LIVEKIT_API_SECRET = os.getenv('LIVEKIT_API_SECRET', 'secret')
-LIVEKIT_URL = os.getenv('LIVEKIT_URL', 'ws://localhost:7880')
+LIVEKIT_DEPLOYMENT = os.getenv("LIVEKIT_DEPLOYMENT", "local").lower()
+
+if LIVEKIT_DEPLOYMENT == "cloud":
+    # Cloud deployment requires explicit credentials
+    LIVEKIT_URL = os.getenv(
+        "LIVEKIT_URL",
+        "wss://voice-translator-52qz9ev9.livekit.cloud",
+    )
+    LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
+    LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
+
+    if not LIVEKIT_API_KEY or not LIVEKIT_API_SECRET:
+        raise RuntimeError(
+            "LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set for cloud deployment"
+        )
+else:
+    LIVEKIT_URL = os.getenv("LIVEKIT_URL", "ws://localhost:7880")
+    LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "devkey")
+    LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "secret")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -51,6 +67,7 @@ class TokenRequest(BaseModel):
 class TokenResponse(BaseModel):
     token: str
     url: str
+    deployment: str
     roomName: str
     participantName: str
 
@@ -59,10 +76,12 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     livekit_url: str
+    deployment: str
 
 
 class ConfigResponse(BaseModel):
     livekit_url: str
+    deployment: str
     supported_languages: List[str]
 
 
@@ -92,6 +111,7 @@ async def generate_token(request: TokenRequest):
         return TokenResponse(
             token=jwt_token,
             url=LIVEKIT_URL,
+            deployment=LIVEKIT_DEPLOYMENT,
             roomName=request.roomName,
             participantName=request.participantName
         )
@@ -106,7 +126,8 @@ async def health_check():
     return HealthResponse(
         status="healthy",
         service="EV Charging Chatbot API",
-        livekit_url=LIVEKIT_URL
+        livekit_url=LIVEKIT_URL,
+        deployment=LIVEKIT_DEPLOYMENT
     )
 
 
@@ -115,6 +136,7 @@ async def get_config():
     """Get public configuration information"""
     return ConfigResponse(
         livekit_url=LIVEKIT_URL,
+        deployment=LIVEKIT_DEPLOYMENT,
         supported_languages=["en", "hi"]
     )
 
@@ -160,6 +182,7 @@ if __name__ == "__main__":
     print("EV Charging Voice Chatbot - FastAPI Server")
     print("=" * 60)
     print(f"LiveKit URL: {LIVEKIT_URL}")
+    print(f"LiveKit Deployment: {LIVEKIT_DEPLOYMENT}")
     print(f"Server running on: http://localhost:5000")
     print(f"API documentation: http://localhost:5000/docs")
     print(f"Alternative API docs: http://localhost:5000/redoc")
