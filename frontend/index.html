@@ -138,18 +138,16 @@
     <script>
         // Debug: Log what's available in global scope
         window.addEventListener('load', () => {
-            console.log('Checking for LiveKit in global scope...');
-            console.log('window.LiveKit:', window.LiveKit);
-            console.log('window.LiveKitClient:', window.LiveKitClient);
-            if (window.LiveKit) {
-                console.log('✅ LiveKit loaded successfully!');
-            } else if (window.LiveKitClient) {
-                console.log('✅ LiveKitClient loaded successfully!');
+            console.log('Checking for LivekitClient in global scope...');
+            console.log('window.LivekitClient:', window.LivekitClient);
+            if (window.LivekitClient) {
+                console.log('✅ LivekitClient loaded successfully!');
+                console.log('Available classes:', Object.keys(window.LivekitClient));
             } else {
-                console.error('❌ No LiveKit library found');
+                console.error('❌ LivekitClient library not found');
             }
         });
     </script>
-    <script src="app.js?v=2.3"></script>
+    <script src="app.js?v=2.4"></script>
 </body>
 </html>
