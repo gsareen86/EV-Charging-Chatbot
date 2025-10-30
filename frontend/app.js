@@ -82,7 +82,7 @@ class EVChargingApp {
             const token = await this.getAccessToken(roomName, participantName);
 
             // Initialize LiveKit room
-            this.room = new LivekitClient.Room({
+            this.room = new LiveKit.Room({
                 adaptiveStream: true,
                 dynacast: true,
             });
@@ -153,22 +153,22 @@ class EVChargingApp {
 
     setupRoomEventListeners() {
         // Track subscribed
-        this.room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        this.room.on(LiveKit.RoomEvent.TrackSubscribed, (track, publication, participant) => {
             console.log('Track subscribed:', track.kind);
 
-            if (track.kind === LivekitClient.Track.Kind.Audio) {
+            if (track.kind === LiveKit.Track.Kind.Audio) {
                 const audioElement = track.attach();
                 document.body.appendChild(audioElement);
             }
         });
 
         // Track unsubscribed
-        this.room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
+        this.room.on(LiveKit.RoomEvent.TrackUnsubscribed, (track) => {
             track.detach().forEach(element => element.remove());
         });
 
         // Data received (for transcriptions)
-        this.room.on(LivekitClient.RoomEvent.DataReceived, (payload, participant) => {
+        this.room.on(LiveKit.RoomEvent.DataReceived, (payload, participant) => {
             const decoder = new TextDecoder();
             const data = JSON.parse(decoder.decode(payload));
 
@@ -178,12 +178,12 @@ class EVChargingApp {
         });
 
         // Participant connected
-        this.room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
+        this.room.on(LiveKit.RoomEvent.ParticipantConnected, (participant) => {
             console.log('Participant connected:', participant.identity);
         });
 
         // Disconnected
-        this.room.on(LivekitClient.RoomEvent.Disconnected, () => {
+        this.room.on(LiveKit.RoomEvent.Disconnected, () => {
             console.log('Disconnected from room');
             this.handleDisconnection();
         });
@@ -195,7 +195,7 @@ class EVChargingApp {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
             // Create local audio track
-            this.localAudioTrack = await LivekitClient.createLocalAudioTrack({
+            this.localAudioTrack = await LiveKit.createLocalAudioTrack({
                 stream: stream,
             });
 
