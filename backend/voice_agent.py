@@ -1,7 +1,7 @@
 """
-LiveKit-based Voice Agent for EV Charging Chatbot
+LiveKit-based Voice Agent for EV Charging Chatbot - ENHANCED DEBUG VERSION
 Handles STT -> LLM -> TTS pipeline with FAISS vector search
-Uses latest LiveKit Agents API with turn detection, preemptive generation, and metrics
+Includes comprehensive logging to diagnose audio subscription issues
 """
 import asyncio
 import json
@@ -19,13 +19,12 @@ from livekit.agents import (
     RoomInputOptions,
     WorkerOptions,
     cli,
-    inference,
     metrics,
     llm,
 )
 from livekit.agents.voice import events as voice_events
-from livekit.plugins import noise_cancellation, silero
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
+from livekit.plugins import noise_cancellation, silero, openai as oai
+from livekit import rtc
 
 from vector_search import VectorSearch
 
@@ -37,8 +36,11 @@ LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "devkey")
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "secret")
 LIVEKIT_AGENT_NAME = os.getenv("LIVEKIT_AGENT_NAME", "ev-charging-assistant")
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging with more detail
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger("ev-charging-agent")
 
 # System prompts for the agent
@@ -63,34 +65,12 @@ Battery swap time: 2-3 minutes
 All stations support QR code authentication
 """
 
-SYSTEM_PROMPT_HI = """आप भारत में EV बैटरी चार्जिंग और स्वैपिंग सेवा के लिए एक सहायक ग्राहक सेवा एजेंट हैं।
-आप हाइपरमार्केट डिलीवरी कर्मियों (HDP) को चार्जिंग स्टेशन, बैटरी स्वैपिंग, खाता प्रबंधन और तकनीकी समस्याओं के बारे में प्रश्नों में सहायता करते हैं।
-
-उपयोगकर्ता आपसे वॉइस के माध्यम से बातचीत कर रहा है, भले ही आप बातचीत को टेक्स्ट के रूप में देखें।
-
-मुख्य दिशानिर्देश:
-1. विनम्र, पेशेवर और सहानुभूतिपूर्ण रहें
-2. स्वाभाविक बातचीत के स्वर में स्पष्ट और संक्षिप्त उत्तर प्रदान करें
-3. प्रश्नों का सटीक उत्तर देने के लिए FAQ डेटाबेस से संदर्भ का उपयोग करें
-4. यदि आपको उत्तर नहीं पता है, तो विनम्रता से कहें और उन्हें मानव एजेंट से जोड़ने की पेशकश करें
-5. तकनीकी समस्याओं से निपटते समय हमेशा समझ की पुष्टि करें
-6. फोन वार्तालाप की तरह स्वाभाविक रूप से बोलें
-7. प्रतिक्रियाओं को संक्षिप्त रखें (अधिकतम 2-3 वाक्य) जब तक कि विशेष रूप से अधिक विवरण का अनुरोध न किया गया हो
-8. आपकी प्रतिक्रियाएं संक्षिप्त, सटीक हैं और बिना किसी जटिल फॉर्मेटिंग या विराम चिह्न जैसे इमोजी, तारांकन, या अन्य प्रतीकों के
-
-सेवा क्षेत्र: दिल्ली एनसीआर, मुंबई, बैंगलोर, हैदराबाद और पुणे
-सहायता: 24x7 हेल्पलाइन 1800-XXX-XXXX पर उपलब्ध
-बैटरी स्वैप समय: 2-3 मिनट
-सभी स्टेशन QR कोड प्रमाणीकरण का समर्थन करते हैं
-"""
-
 
 class EVChargingAssistant(Agent):
     """EV Charging Voice Assistant with FAISS-backed context retrieval"""
 
     def __init__(self):
         """Initialize the assistant with vector search capability"""
-        # Default to English, will be detected dynamically
         super().__init__(instructions=SYSTEM_PROMPT_EN)
 
         try:
@@ -103,48 +83,28 @@ class EVChargingAssistant(Agent):
             self.vector_search = None
 
     def detect_language(self, text: str) -> str:
-        """
-        Detect language from text
-        Simple heuristic: if text contains Hindi unicode characters, it's Hindi
-
-        Args:
-            text: Input text to analyze
-
-        Returns:
-            Language code ('en' or 'hi')
-        """
-        # Check for Devanagari script (Hindi)
+        """Detect language from text"""
         for char in text:
             if '\u0900' <= char <= '\u097F':
                 return 'hi'
         return 'en'
 
     async def get_context(self, user_message: str) -> str:
-        """
-        Get relevant context from FAISS vector database
-
-        Args:
-            user_message: User's query
-
-        Returns:
-            Context string to be added to LLM prompt
-        """
+        """Get relevant context from FAISS vector database"""
         if not self.vector_search:
             return ""
 
         try:
-            # Detect language
             self.current_language = self.detect_language(user_message)
             logger.info(f"Detected language: {self.current_language}")
 
-            # Get relevant FAQs
             context = self.vector_search.get_context_for_llm(
                 query=user_message,
                 language=self.current_language,
                 top_k=3
             )
 
-            return f"\n\nRELEVANT CONTEXT FROM FAQ DATABASE:\n{context}\n\nUse the above context to answer the user's question accurately. If the context doesn't contain relevant information, use your general knowledge about EV charging services."
+            return f"\n\nRELEVANT CONTEXT FROM FAQ DATABASE:\n{context}\n\nUse the above context to answer the user's question accurately."
 
         except Exception as e:
             logger.error(f"Error getting context: {e}")
@@ -152,196 +112,215 @@ class EVChargingAssistant(Agent):
 
     def get_system_prompt(self) -> str:
         """Get system prompt based on current language"""
-        return SYSTEM_PROMPT_HI if self.current_language == 'hi' else SYSTEM_PROMPT_EN
-
-    # You can add function tools here if needed
-    # Example:
-    # @function_tool
-    # async def check_battery_availability(self, context: RunContext, station_name: str):
-    #     """Check battery availability at a specific station"""
-    #     logger.info(f"Checking battery availability at {station_name}")
-    #     # Implement actual logic here
-    #     return f"Station {station_name} has 5 batteries available"
+        return SYSTEM_PROMPT_EN
 
 
 def prewarm(proc: JobProcess):
-    """
-    Prewarm function to load models before first use
-    This improves initial response time
-    """
+    """Prewarm function to load models before first use"""
     logger.info("Prewarming models...")
     proc.userdata["vad"] = silero.VAD.load()
     logger.info("VAD model prewarmed")
 
 
 async def entrypoint(ctx: JobContext):
-    """
-    Main entrypoint for the voice agent
-    This function is called when a new participant joins the room
-    """
-    # Logging setup - add context for better debugging
+    """Main entrypoint for the voice agent"""
     ctx.log_context_fields = {
         "room": ctx.room.name,
         "service": "ev-charging-chatbot"
     }
 
-    logger.info("Starting EV Charging Voice Agent")
+    logger.info("=" * 80)
+    logger.info("STARTING EV CHARGING VOICE AGENT - ENHANCED DEBUG MODE")
+    logger.info("=" * 80)
 
-    # Initialize the EV Charging Assistant
+    # STEP 1: Connect to the room FIRST
+    logger.info("STEP 1: Connecting to room...")
+    await ctx.connect()
+    logger.info(f"✓ Agent connected to room: {ctx.room.name}")
+    
+    # Log room state
+    logger.info(f"Room SID: {ctx.room.sid}")
+    logger.info(f"Room participants: {len(ctx.room.remote_participants)}")
+    logger.info(f"Local participant identity: {ctx.room.local_participant.identity}")
+    
+    # STEP 2: Wait for a participant to join
+    logger.info("STEP 2: Waiting for user participant to join...")
+    try:
+        participant = await ctx.wait_for_participant()
+        logger.info(f"✓ User participant joined: {participant.identity}")
+        logger.info(f"  - SID: {participant.sid}")
+        logger.info(f"  - Metadata: {participant.metadata}")
+        
+        # Log participant's tracks
+        logger.info(f"  - Audio tracks: {len(list(participant.track_publications.values()))}")
+        for pub_sid, pub in participant.track_publications.items():
+            logger.info(f"    * Track: {pub.sid}, Kind: {pub.kind}, Subscribed: {pub.subscribed}")
+            
+    except Exception as e:
+        logger.error(f"Error waiting for participant: {e}", exc_info=True)
+
+    # STEP 3: Set up room event handlers for debugging
+    @ctx.room.on("track_published")
+    def on_track_published(publication: rtc.RemoteTrackPublication, participant: rtc.RemoteParticipant):
+        logger.info(f"🎵 TRACK PUBLISHED by {participant.identity}")
+        logger.info(f"   - Track SID: {publication.sid}")
+        logger.info(f"   - Track kind: {publication.kind}")
+        logger.info(f"   - Track source: {publication.source}")
+
+    @ctx.room.on("track_subscribed")
+    def on_track_subscribed(
+        track: rtc.Track,
+        publication: rtc.RemoteTrackPublication,
+        participant: rtc.RemoteParticipant,
+    ):
+        logger.info(f"🎧 TRACK SUBSCRIBED from {participant.identity}")
+        logger.info(f"   - Track SID: {track.sid}")
+        logger.info(f"   - Track kind: {track.kind}")
+        if track.kind == rtc.TrackKind.KIND_AUDIO:
+            logger.info("   - ✓ AUDIO TRACK SUBSCRIBED - Agent should now hear user!")
+
+    @ctx.room.on("track_unsubscribed")
+    def on_track_unsubscribed(
+        track: rtc.Track,
+        publication: rtc.RemoteTrackPublication,
+        participant: rtc.RemoteParticipant,
+    ):
+        logger.info(f"🔇 TRACK UNSUBSCRIBED from {participant.identity}")
+
+    @ctx.room.on("data_received")
+    def on_data_received(data: rtc.DataPacket):
+        logger.debug(f"Data received from {data.participant.identity if data.participant else 'unknown'}")
+
+    # STEP 4: Initialize the assistant
+    logger.info("STEP 3: Initializing EV Charging Assistant...")
     assistant = EVChargingAssistant()
 
-    # Set up the agent session with the voice pipeline
+    # STEP 5: Create the agent session
+    logger.info("STEP 4: Creating AgentSession...")
     session = AgentSession(
-        # Speech-to-text (STT) - the agent's ears
-        # Using OpenAI Whisper with auto language detection
-        stt=inference.STT(
-            model="openai/whisper-1",
-            language=None,  # Auto-detect between English and Hindi
+        stt=oai.STT(
+            model="gpt-4o-transcribe",
+            language="en",
+            use_realtime=True
         ),
-
-        # Large Language Model (LLM) - the agent's brain
-        # Using GPT-4o-mini for fast, cost-effective responses
-        llm=inference.LLM(
-            model="openai/gpt-4o-mini",
-            temperature=0.7,  # Balanced between creativity and consistency
+        llm=oai.LLM(
+            model="gpt-4o-mini",
+            temperature=0.2,
         ),
-
-        # Text-to-speech (TTS) - the agent's voice
-        # Using OpenAI TTS with a clear, professional voice
-        tts=inference.TTS(
-            model="openai/tts-1",
-            voice="nova",  # Clear and professional voice
+        tts=oai.TTS(
+            model="gpt-4o-mini-tts",
+            voice="alloy",
+            speed=1.0,
         ),
-
-        # Voice Activity Detection and Turn Detection
-        # MultilingualModel supports both English and Hindi
-        turn_detection=MultilingualModel(),
+        turn_detection="vad",
         vad=ctx.proc.userdata["vad"],
-
-        # Preemptive generation allows the LLM to start generating
-        # a response while waiting for the end of the user's turn
-        # This significantly reduces response latency
         preemptive_generation=True,
     )
 
-    # For using OpenAI Realtime API instead (alternative approach):
-    # Uncomment below and install livekit-agents[openai]
-    # from livekit.plugins import openai
-    # session = AgentSession(
-    #     llm=openai.realtime.RealtimeModel(voice="shimmer")
-    # )
-
-    # Set up metrics collection to measure pipeline performance
+    # Set up metrics collection
     usage_collector = metrics.UsageCollector()
 
     @session.on("metrics_collected")
     def _on_metrics_collected(ev: MetricsCollectedEvent):
-        """Handle metrics collection events"""
         metrics.log_metrics(ev.metrics)
         usage_collector.collect(ev.metrics)
 
     async def log_usage():
-        """Log usage summary on shutdown"""
         summary = usage_collector.get_summary()
         logger.info(f"Session Usage Summary: {summary}")
 
-    # Register shutdown callback
     ctx.add_shutdown_callback(log_usage)
 
-    # Custom before_llm callback to inject FAISS context
-    async def _handle_user_speech(speech_text: str) -> None:
-        """Async helper to process committed user speech."""
-        logger.info(f"User said: {speech_text}")
-
-        # Get context from FAISS
-        context = await assistant.get_context(speech_text)
-
-        if context:
-            # Update the agent's instructions with the retrieved context
-            # and language-appropriate system prompt
-            updated_instructions = assistant.get_system_prompt() + context
-            assistant.instructions = updated_instructions
-            logger.info("Context injected into agent instructions")
+    # Enhanced event handlers with detailed logging
+    @session.on("user_input_transcribed")
+    def _on_user_input_transcribed(ev: voice_events.UserInputTranscribedEvent):
+        logger.info(f"📝 USER TRANSCRIPTION: '{ev.transcript}' (final: {ev.is_final})")
+        
+        # Publish to frontend
+        try:
+            ctx.room.local_participant.publish_data(
+                json.dumps({
+                    "type": "transcription",
+                    "role": "user",
+                    "text": ev.transcript,
+                    "isFinal": ev.is_final,
+                    "language": ev.language,
+                }).encode("utf-8"),
+                reliable=ev.is_final,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to publish user transcript: {e}")
 
     @session.on("user_speech_committed")
     def _on_user_speech(speech_text: str) -> None:
-        """Schedule async handling for committed user speech."""
-        asyncio.create_task(_handle_user_speech(speech_text))
-
-    def publish_transcript_message(
-        *,
-        role: str,
-        text: str,
-        is_final: bool,
-        language: Optional[str] = None,
-    ) -> None:
-        """Publish transcription data to room participants via the data channel."""
-
-        if not text:
-            return
-
-        if not language:
-            language = assistant.detect_language(text)
-
-        try:
-            ctx.room.local_participant.publish_data(
-                json.dumps(
-                    {
-                        "type": "transcription",
-                        "role": role,
-                        "text": text,
-                        "isFinal": is_final,
-                        "language": language,
-                    }
-                ).encode("utf-8"),
-                reliable=is_final,
-            )
-        except Exception as publish_error:  # pragma: no cover - defensive logging
-            logger.warning(
-                "Failed to publish transcript data: %s", publish_error, exc_info=True
-            )
-
-    @session.on("user_input_transcribed")
-    def _on_user_input_transcribed(ev: voice_events.UserInputTranscribedEvent):
-        publish_transcript_message(
-            role="user",
-            text=ev.transcript,
-            is_final=ev.is_final,
-            language=ev.language,
-        )
+        logger.info(f"💬 USER SPEECH COMMITTED: '{speech_text}'")
+        
+        async def _handle():
+            context = await assistant.get_context(speech_text)
+            if context:
+                updated_instructions = assistant.get_system_prompt() + context
+                await assistant.update_instructions(updated_instructions)
+                logger.info("✓ Context injected into agent instructions")
+        
+        asyncio.create_task(_handle())
 
     @session.on("conversation_item_added")
     def _on_conversation_item_added(ev: voice_events.ConversationItemAddedEvent):
         item = ev.item
-        if not isinstance(item, llm.ChatMessage):
-            return
+        if isinstance(item, llm.ChatMessage) and item.role == "assistant":
+            text = item.text_content or ""
+            logger.info(f"🤖 ASSISTANT RESPONSE: '{text}'")
+            
+            # Publish to frontend
+            try:
+                ctx.room.local_participant.publish_data(
+                    json.dumps({
+                        "type": "transcription",
+                        "role": "assistant",
+                        "text": text,
+                        "isFinal": True,
+                        "language": "en",
+                    }).encode("utf-8"),
+                    reliable=True,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to publish assistant response: {e}")
 
-        if item.role != "assistant":
-            return
+    @session.on("agent_speech_started")
+    def _on_agent_speech_started():
+        logger.info("🗣️ AGENT STARTED SPEAKING")
 
-        text = item.text_content or ""
-        publish_transcript_message(role="assistant", text=text, is_final=True)
+    @session.on("agent_speech_stopped")
+    def _on_agent_speech_stopped():
+        logger.info("🛑 AGENT STOPPED SPEAKING")
 
-    # Start the session
+    @session.on("user_started_speaking")
+    def _on_user_started_speaking():
+        logger.info("👂 USER STARTED SPEAKING (detected by VAD)")
+
+    @session.on("user_stopped_speaking")
+    def _on_user_stopped_speaking():
+        logger.info("🔇 USER STOPPED SPEAKING (detected by VAD)")
+
+    # STEP 6: Start the session
+    logger.info("STEP 5: Starting AgentSession...")
     await session.start(
         agent=assistant,
         room=ctx.room,
         room_input_options=RoomInputOptions(
-            # Use BVC noise cancellation for clear audio
-            # For telephony applications, use BVCTelephony instead
             noise_cancellation=noise_cancellation.BVC(),
         ),
     )
 
-    # Connect to the room
-    await ctx.connect()
-
-    logger.info(f"Agent connected to room: {ctx.room.name}")
-    logger.info("Voice agent started successfully with turn detection and preemptive generation enabled")
+    logger.info("=" * 80)
+    logger.info("✓ VOICE AGENT FULLY INITIALIZED AND LISTENING")
+    logger.info("=" * 80)
+    logger.info("Waiting for user audio input...")
+    logger.info("If you speak now, you should see VAD and transcription events above")
+    logger.info("=" * 80)
 
 
 if __name__ == "__main__":
-    # Run the agent with prewarm function
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
