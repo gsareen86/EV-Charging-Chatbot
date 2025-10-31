@@ -3,6 +3,7 @@ LiveKit-based Voice Agent for EV Charging Chatbot
 Handles STT -> LLM -> TTS pipeline with FAISS vector search
 Uses latest LiveKit Agents API with turn detection, preemptive generation, and metrics
 """
+import asyncio
 import json
 import os
 import logging
@@ -248,12 +249,8 @@ async def entrypoint(ctx: JobContext):
     ctx.add_shutdown_callback(log_usage)
 
     # Custom before_llm callback to inject FAISS context
-    @session.on("user_speech_committed")
-    async def _on_user_speech(speech_text: str):
-        """
-        Called when user speech is finalized
-        Use this to inject context from FAISS before LLM processes the query
-        """
+    async def _handle_user_speech(speech_text: str) -> None:
+        """Async helper to process committed user speech."""
         logger.info(f"User said: {speech_text}")
 
         # Get context from FAISS
@@ -265,6 +262,11 @@ async def entrypoint(ctx: JobContext):
             updated_instructions = assistant.get_system_prompt() + context
             assistant.instructions = updated_instructions
             logger.info("Context injected into agent instructions")
+
+    @session.on("user_speech_committed")
+    def _on_user_speech(speech_text: str) -> None:
+        """Schedule async handling for committed user speech."""
+        asyncio.create_task(_handle_user_speech(speech_text))
 
     def publish_transcript_message(
         *,
