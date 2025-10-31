@@ -49,6 +49,19 @@ else:
 _dispatch_cache: Set[str] = set()
 
 
+async def _ensure_room_exists(lk_api: LiveKitAPI, room_name: str) -> None:
+    """Create the LiveKit room if it does not already exist."""
+
+    try:
+        await lk_api.room.create_room(api.CreateRoomRequest(name=room_name))
+        logger.info("Created LiveKit room %s", room_name)
+    except TwirpError as error:
+        if error.code == TwirpErrorCode.ALREADY_EXISTS:
+            logger.debug("Room %s already exists", room_name)
+        else:
+            raise
+
+
 async def ensure_agent_dispatch(room_name: str) -> None:
     """Ensure the LiveKit voice agent is dispatched to the requested room."""
 
@@ -65,7 +78,17 @@ async def ensure_agent_dispatch(room_name: str) -> None:
             api_key=LIVEKIT_API_KEY,
             api_secret=LIVEKIT_API_SECRET,
         ) as lk_api:
-            existing_dispatches = await lk_api.agent_dispatch.list_dispatch(room_name)
+            try:
+                existing_dispatches = await lk_api.agent_dispatch.list_dispatch(room_name)
+            except TwirpError as error:
+                if error.code == TwirpErrorCode.NOT_FOUND:
+                    logger.info(
+                        "Room %s missing when listing dispatches, creating room", room_name
+                    )
+                    await _ensure_room_exists(lk_api, room_name)
+                    existing_dispatches = []
+                else:
+                    raise
             for dispatch in existing_dispatches:
                 if dispatch.agent_name == LIVEKIT_AGENT_NAME:
                     _dispatch_cache.add(room_name)
@@ -75,14 +98,31 @@ async def ensure_agent_dispatch(room_name: str) -> None:
                         room_name,
                     )
                     return
-
-            await lk_api.agent_dispatch.create_dispatch(
-                api.CreateAgentDispatchRequest(
-                    agent_name=LIVEKIT_AGENT_NAME,
-                    room=room_name,
-                    metadata=json.dumps({"service": "ev-charging-assistant"}),
+            try:
+                await lk_api.agent_dispatch.create_dispatch(
+                    api.CreateAgentDispatchRequest(
+                        agent_name=LIVEKIT_AGENT_NAME,
+                        room=room_name,
+                        metadata=json.dumps({"service": "ev-charging-assistant"}),
+                    )
                 )
-            )
+            except TwirpError as error:
+                if error.code == TwirpErrorCode.NOT_FOUND:
+                    logger.info(
+                        "Room %s missing when creating dispatch, creating room and retrying",
+                        room_name,
+                    )
+                    await _ensure_room_exists(lk_api, room_name)
+                    await lk_api.agent_dispatch.create_dispatch(
+                        api.CreateAgentDispatchRequest(
+                            agent_name=LIVEKIT_AGENT_NAME,
+                            room=room_name,
+                            metadata=json.dumps({"service": "ev-charging-assistant"}),
+                        )
+                    )
+                else:
+                    raise
+
             _dispatch_cache.add(room_name)
             logger.info(
                 "Created LiveKit agent dispatch for %s in room %s",
