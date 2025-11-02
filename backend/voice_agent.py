@@ -173,7 +173,7 @@ class EVChargingAssistant(Agent):
         # Publish transfer event to frontend
         try:
             if hasattr(context, 'room'):
-                context.room.local_participant.publish_data(
+                await context.room.local_participant.publish_data(
                     json.dumps({
                         "type": "transfer_request",
                         "reason": reason,
@@ -270,21 +270,26 @@ async def entrypoint(ctx: JobContext):
         else:
             logger.debug(f"💬 USER (partial): '{ev.transcript}'")
         
-        # Publish to frontend - both partial and final for real-time feel
-        try:
-            ctx.room.local_participant.publish_data(
-                json.dumps({
-                    "type": "transcription",
-                    "role": "user",
-                    "text": ev.transcript,
-                    "isFinal": ev.is_final,
-                    "language": ev.language or "en",
-                    "timestamp": asyncio.get_event_loop().time(),
-                }).encode("utf-8"),
-                reliable=ev.is_final,  # Use reliable delivery for final transcripts
-            )
-        except Exception as e:
-            logger.warning(f"Failed to publish user transcript: {e}")
+        # Async task to Publish to frontend - both partial and final for real-time feel
+        async def publish_user_transcript():
+            try:
+                await ctx.room.local_participant.publish_data(
+                    json.dumps({
+                        "type": "transcription",
+                        "role": "user",
+                        "text": ev.transcript,
+                        "isFinal": ev.is_final,
+                        "language": ev.language or "en",
+                        "timestamp": asyncio.get_event_loop().time(),
+                    }).encode("utf-8"),
+                    reliable=ev.is_final,  # Use reliable delivery for final transcripts
+                )
+                logger.info(f"✓ Published user transcript to frontend: '{ev.transcript[:50]}...'")
+            except Exception as e:
+                logger.warning(f"❌ Failed to publish user transcript: {e}")
+       
+        # Create task to run async publish
+        asyncio.create_task(publish_user_transcript())
 
     @session.on("user_speech_committed")
     def _on_user_speech_committed(speech_text: str):
@@ -317,21 +322,26 @@ async def entrypoint(ctx: JobContext):
             
         logger.info(f"🤖 ASSISTANT: '{text}'")
         
-        # Publish complete assistant response to frontend
-        try:
-            ctx.room.local_participant.publish_data(
-                json.dumps({
-                    "type": "transcription",
-                    "role": "assistant",
-                    "text": text,
-                    "isFinal": True,
-                    "language": "en",  # Assistant always responds in detected language
-                    "timestamp": asyncio.get_event_loop().time(),
-                }).encode("utf-8"),
-                reliable=True,
-            )
-        except Exception as e:
-            logger.warning(f"Failed to publish assistant response: {e}")
+        # Async task to Publish complete assistant response to frontend
+        async def publish_assistant_response():
+            try:
+                await ctx.room.local_participant.publish_data(
+                    json.dumps({
+                        "type": "transcription",
+                        "role": "assistant",
+                        "text": text,
+                        "isFinal": True,
+                        "language": "en",  # Assistant always responds in detected language
+                        "timestamp": asyncio.get_event_loop().time(),
+                    }).encode("utf-8"),
+                    reliable=True,
+                )
+                logger(f"✓ Published assistant response to frontend: '{text[:50]}...'")
+            except Exception as e:
+                logger.warning(f"❌ Failed to publish assistant response: {e}")
+        
+        # Create task to run async publish
+        asyncio.create_task(publish_assistant_response())
 
     # Track subscribed event for debugging
     @ctx.room.on("track_subscribed")

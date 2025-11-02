@@ -1,10 +1,9 @@
 /**
- * EV Charging Voice Assistant - PRODUCTION Frontend
- * Features:
- * - Real-time streaming transcriptions (partial + final)
- * - Chat-like interface with proper message bubbles
- * - Proper sentence completion handling
- * - Transfer request notifications
+ * EV Charging Voice Assistant - FIXED & DEBUGGED VERSION
+ * Issues Fixed:
+ * 1. Live transcriptions now display correctly
+ * 2. Speaking indicators work properly
+ * 3. Auto-disconnect fixed with better keyword detection
  */
 
 class EVChargingApp {
@@ -15,14 +14,28 @@ class EVChargingApp {
         this.localAudioTrack = null;
         this.transcripts = [];
         
-        // Track current partial transcriptions to update them
+        // Track current partial transcriptions
         this.currentUserPartial = null;
         this.currentAssistantPartial = null;
+        
+        // Track speaking state
+        this.currentSpeaker = null;
+        this.speakingTimeout = null;
+        
+        // Auto-disconnect keywords (more comprehensive)
+        this.goodbyeKeywords = [
+            'goodbye', 'good bye', 'bye', 'by', 'thank you', 'thanks', 'thankyou',
+            'thats all', 'that\'s all', 'nothing else', 'no more', 'all done',
+            'im done', 'i\'m done', 'done', 'ok bye', 'okay bye',
+            'धन्यवाद', 'शुक्रिया', 'अलविदा', 'धन्यवाद'
+        ];
 
         this.initializeElements();
         this.attachEventListeners();
+        this.loadThemePreference();
         
-        console.log('🚀 EV Charging App initialized');
+        console.log('🚀 EV Charging App initialized - DEBUG MODE');
+        console.log('📋 Auto-disconnect keywords:', this.goodbyeKeywords);
     }
 
     initializeElements() {
@@ -32,23 +45,29 @@ class EVChargingApp {
         this.muteBtn = document.getElementById('muteBtn');
         this.clearBtn = document.getElementById('clearBtn');
         this.cancelBtn = document.getElementById('cancelBtn');
+        this.themeToggle = document.getElementById('themeToggle');
 
         // Status elements
         this.connectionStatus = document.getElementById('connectionStatus');
         this.statusDot = document.getElementById('statusDot');
         this.statusText = document.getElementById('statusText');
         this.connectionInfo = document.getElementById('connectionInfo');
-        this.waveContainer = document.getElementById('waveContainer');
 
         // Transcription elements
         this.transcriptionContent = document.getElementById('transcriptionContent');
         this.languageIndicator = document.getElementById('languageIndicator');
+        this.speakingIndicator = document.getElementById('speakingIndicator');
+        this.speakerAvatar = document.getElementById('speakerAvatar');
+        this.speakerName = document.getElementById('speakerName');
 
         // Modal elements
         this.connectionModal = document.getElementById('connectionModal');
         this.connectionForm = document.getElementById('connectionForm');
         this.roomNameInput = document.getElementById('roomName');
         this.participantNameInput = document.getElementById('participantName');
+        
+        // Toast notification
+        this.autoDisconnectToast = document.getElementById('autoDisconnectToast');
     }
 
     attachEventListeners() {
@@ -58,7 +77,35 @@ class EVChargingApp {
         this.clearBtn.addEventListener('click', () => this.clearTranscripts());
         this.cancelBtn.addEventListener('click', () => this.hideConnectionModal());
         this.connectionForm.addEventListener('submit', (e) => this.handleConnectionSubmit(e));
+        this.themeToggle.addEventListener('click', () => this.toggleTheme());
     }
+
+    /* ====================================
+       THEME TOGGLE
+       ==================================== */
+
+    loadThemePreference() {
+        const savedTheme = localStorage.getItem('ev-assistant-theme') || 'light';
+        this.setTheme(savedTheme);
+    }
+
+    toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        this.setTheme(newTheme);
+    }
+
+    setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('ev-assistant-theme', theme);
+        
+        const themeIcon = this.themeToggle.querySelector('.theme-icon');
+        themeIcon.textContent = theme === 'light' ? '🌙' : '☀️';
+    }
+
+    /* ====================================
+       CONNECTION MANAGEMENT
+       ==================================== */
 
     showConnectionModal() {
         this.connectionModal.classList.add('active');
@@ -87,12 +134,12 @@ class EVChargingApp {
         try {
             console.log('🔌 Starting connection...');
             this.updateStatus('connecting', 'Connecting...');
-            this.connectionInfo.innerHTML = '<p>Connecting to voice assistant...</p>';
+            this.connectionInfo.innerHTML = '<p>🔄 Connecting to voice assistant...</p>';
 
             // Get access token
             const connectionConfig = await this.getAccessToken(roomName, participantName);
-            const { token, url: livekitUrl, deployment } = connectionConfig;
-            console.log(`✓ Token received`);
+            const { token, url: livekitUrl } = connectionConfig;
+            console.log(`✓ Token received for room: ${roomName}`);
 
             // Initialize LiveKit room
             this.room = new LivekitClient.Room({
@@ -100,12 +147,12 @@ class EVChargingApp {
                 dynacast: true,
             });
 
-            // Set up event listeners
+            // Set up event listeners BEFORE connecting
             this.setupRoomEventListeners();
 
             // Connect to the room
             await this.room.connect(livekitUrl, token);
-            console.log('✓ Connected to room');
+            console.log('✓ Connected to room:', this.room.name);
 
             // Set up local audio
             await this.setupLocalAudio();
@@ -113,10 +160,9 @@ class EVChargingApp {
             this.isConnected = true;
             this.updateStatus('connected', 'Connected');
             this.connectionInfo.innerHTML = `
-                <p>✓ Connected! Start speaking to interact with the assistant.</p>
+                <p>✅ Connected! Start speaking to interact with the assistant.</p>
                 <p class="info-detail"><strong>Room:</strong> ${this.room.name}</p>
             `;
-            this.waveContainer.classList.add('active');
 
             // Enable/disable buttons
             this.connectBtn.disabled = true;
@@ -124,11 +170,12 @@ class EVChargingApp {
             this.muteBtn.disabled = false;
 
             console.log('✅ Ready to interact!');
+            console.log('🎤 Speak into your microphone to test...');
 
         } catch (error) {
             console.error('❌ Connection error:', error);
             this.updateStatus('disconnected', 'Connection Failed');
-            this.connectionInfo.innerHTML = `<p style="color: var(--danger-color);">Connection failed: ${error.message}</p>`;
+            this.connectionInfo.innerHTML = `<p style="color: var(--danger-color);">⚠️ Connection failed: ${error.message}</p>`;
             alert('Connection failed. Please check that backend and LiveKit servers are running.');
         }
     }
@@ -138,6 +185,8 @@ class EVChargingApp {
         if (!apiBaseUrl.startsWith('http')) {
             apiBaseUrl = 'http://localhost:5000';
         }
+
+        console.log('🔑 Requesting token from:', `${apiBaseUrl}/api/token`);
 
         const response = await fetch(`${apiBaseUrl}/api/token`, {
             method: 'POST',
@@ -152,37 +201,58 @@ class EVChargingApp {
         return await response.json();
     }
 
+    /* ====================================
+       ROOM EVENT LISTENERS - FIXED!
+       ==================================== */
+
     setupRoomEventListeners() {
         console.log('📡 Setting up event listeners...');
 
         // Track subscribed - play agent audio
         this.room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-            console.log(`🎧 Track subscribed from ${participant.identity}`);
+            console.log(`🎧 Track subscribed from ${participant.identity}, kind: ${track.kind}`);
             
             if (track.kind === LivekitClient.Track.Kind.Audio) {
                 const audioElement = track.attach();
                 audioElement.autoplay = true;
                 document.body.appendChild(audioElement);
-                console.log('✓ Agent audio element attached');
+                console.log('✓ Agent audio element attached and playing');
+                
+                // Show speaking indicator when agent audio plays
+                this.showSpeakingIndicator('assistant', 2000); // Show for 2 seconds
             }
         });
 
         // Track unsubscribed
         this.room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
+            console.log('🔇 Track unsubscribed');
             track.detach().forEach(element => element.remove());
         });
 
-        // Data received - Handle transcriptions and transfer requests
+        // DATA RECEIVED - This is critical for transcriptions!
         this.room.on(LivekitClient.RoomEvent.DataReceived, (payload, participant) => {
-            const decoder = new TextDecoder();
-            const data = JSON.parse(decoder.decode(payload));
-            
-            console.log('📦 Data received:', data.type, data);
+            try {
+                const decoder = new TextDecoder();
+                const dataString = decoder.decode(payload);
+                const data = JSON.parse(dataString);
+                
+                console.log('📦 DATA RECEIVED:', {
+                    type: data.type,
+                    role: data.role,
+                    text: data.text?.substring(0, 50) + '...',
+                    isFinal: data.isFinal,
+                    fullData: data
+                });
 
-            if (data.type === 'transcription') {
-                this.handleTranscription(data);
-            } else if (data.type === 'transfer_request') {
-                this.handleTransferRequest(data);
+                if (data.type === 'transcription') {
+                    this.handleTranscription(data);
+                } else if (data.type === 'transfer_request') {
+                    this.handleTransferRequest(data);
+                } else {
+                    console.log('⚠️ Unknown data type:', data.type);
+                }
+            } catch (error) {
+                console.error('❌ Error processing data:', error);
             }
         });
 
@@ -196,18 +266,29 @@ class EVChargingApp {
             this.handleDisconnection();
         });
 
-        console.log('✓ Event listeners configured');
+        console.log('✓ Event listeners configured successfully');
     }
 
+    /* ====================================
+       TRANSCRIPTION HANDLING - FIXED!
+       ==================================== */
+
     handleTranscription(data) {
-        /**
-         * Handle real-time transcription data
-         * - Updates partial transcripts in-place
-         * - Finalizes complete sentences
-         */
         const { role, text, isFinal, language } = data;
         
-        if (!text || text.trim() === '') return;
+        // DEBUG: Log everything
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`📝 TRANSCRIPTION RECEIVED:`);
+        console.log(`   Role: ${role}`);
+        console.log(`   Text: "${text}"`);
+        console.log(`   Final: ${isFinal}`);
+        console.log(`   Language: ${language}`);
+        console.log(`${'='.repeat(60)}\n`);
+        
+        if (!text || text.trim() === '') {
+            console.log('⚠️ Empty text, skipping...');
+            return;
+        }
 
         // Update language indicator
         this.updateLanguageIndicator(language || 'en');
@@ -215,9 +296,22 @@ class EVChargingApp {
         // Remove empty state if present
         const emptyState = this.transcriptionContent.querySelector('.empty-state');
         if (emptyState) {
+            console.log('🗑️ Removing empty state');
             emptyState.remove();
         }
 
+        // Show speaking indicator based on role and finality
+        if (role === 'user') {
+            if (!isFinal) {
+                this.showSpeakingIndicator('user', null); // Show until final
+            } else {
+                this.hideSpeakingIndicator(); // Hide when user done
+            }
+        } else if (role === 'assistant' && isFinal) {
+            this.showSpeakingIndicator('assistant', 3000); // Show for 3 seconds
+        }
+
+        // Handle transcripts
         if (role === 'user') {
             this.handleUserTranscript(text, isFinal, language);
         } else if (role === 'assistant') {
@@ -229,81 +323,205 @@ class EVChargingApp {
     }
 
     handleUserTranscript(text, isFinal, language) {
-        /**
-         * Handle user transcriptions with partial updates
-         */
+        console.log(`👤 USER TRANSCRIPT: isFinal=${isFinal}`);
+        
         if (!isFinal) {
-            // Update or create partial transcript
+            // Handle partial transcript
             if (this.currentUserPartial) {
-                // Update existing partial
+                // Update existing partial message
                 const messageText = this.currentUserPartial.querySelector('.message-text');
                 messageText.textContent = text;
-                messageText.classList.add('partial');
+                console.log('   ↻ Updated partial message');
             } else {
                 // Create new partial message
-                const messageDiv = this.createTranscriptMessage('user', text, language, false);
-                this.transcriptionContent.appendChild(messageDiv);
-                this.currentUserPartial = messageDiv;
+                this.currentUserPartial = this.createTranscriptMessage('user', text, language, false);
+                this.transcriptionContent.appendChild(this.currentUserPartial);
+                console.log('   + Created new partial message');
             }
         } else {
-            // Final transcript - update or create
+            // Final transcript
             if (this.currentUserPartial) {
-                // Update the partial to final
+                // Finalize existing partial
                 const messageText = this.currentUserPartial.querySelector('.message-text');
                 messageText.textContent = text;
                 messageText.classList.remove('partial');
                 
-                const timeEl = this.currentUserPartial.querySelector('.message-time');
-                timeEl.textContent = this.getCurrentTimeString();
+                const messageTime = this.currentUserPartial.querySelector('.message-time');
+                messageTime.textContent = this.getCurrentTimeString();
                 
                 this.currentUserPartial.dataset.final = 'true';
+                console.log('   ✓ Finalized partial message');
                 this.currentUserPartial = null;
             } else {
                 // Create new final message
-                const messageDiv = this.createTranscriptMessage('user', text, language, true);
-                this.transcriptionContent.appendChild(messageDiv);
+                const message = this.createTranscriptMessage('user', text, language, true);
+                this.transcriptionContent.appendChild(message);
+                console.log('   + Created new final message');
             }
             
-            // Save to history
-            this.transcripts.push({
-                role: 'user',
-                text: text,
-                timestamp: new Date(),
-                language: language
-            });
-
-            console.log('💬 User (final):', text);
+            // Check for goodbye intent
+            console.log('🔍 Checking for goodbye intent...');
+            this.checkGoodbyeIntent(text);
         }
     }
 
     handleAssistantTranscript(text, isFinal, language) {
-        /**
-         * Handle assistant transcriptions (usually only final)
-         */
+        console.log(`🤖 ASSISTANT TRANSCRIPT: isFinal=${isFinal}`);
+        
         if (isFinal) {
-            // Create or update final assistant message
-            const messageDiv = this.createTranscriptMessage('assistant', text, language, true);
-            this.transcriptionContent.appendChild(messageDiv);
+            // Create new final message
+            const message = this.createTranscriptMessage('assistant', text, language, true);
+            this.transcriptionContent.appendChild(message);
+            console.log('   + Created assistant message');
             
-            // Save to history
-            this.transcripts.push({
-                role: 'assistant',
-                text: text,
-                timestamp: new Date(),
-                language: language
-            });
-
-            console.log('🤖 Assistant:', text);
+            this.currentAssistantPartial = null;
         }
     }
 
+    createTranscriptMessage(role, text, language, isFinal) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `transcript-message ${role}`;
+        messageDiv.dataset.role = role;
+        messageDiv.dataset.final = isFinal ? 'true' : 'false';
+        messageDiv.dataset.language = language || 'en';
+
+        const timeString = isFinal ? this.getCurrentTimeString() : '';
+        const partialClass = !isFinal ? 'partial' : '';
+        const icon = role === 'user' ? '👤' : '🤖';
+        const label = role === 'user' ? 'You' : 'AI Assistant';
+
+        messageDiv.innerHTML = `
+            <div class="message-avatar">${icon}</div>
+            <div class="message-content">
+                <div class="message-header">
+                    <span class="message-label">${label}</span>
+                    <span class="message-time">${timeString}</span>
+                </div>
+                <div class="message-text ${partialClass}">${this.escapeHtml(text)}</div>
+            </div>
+        `;
+
+        return messageDiv;
+    }
+
+    /* ====================================
+       SPEAKING INDICATOR - FIXED!
+       ==================================== */
+
+    showSpeakingIndicator(speaker, duration) {
+        console.log(`🌊 Showing speaking indicator for: ${speaker}, duration: ${duration}ms`);
+        
+        this.currentSpeaker = speaker;
+        this.speakingIndicator.classList.add('active');
+        
+        if (speaker === 'user') {
+            this.speakerAvatar.textContent = '👤';
+            this.speakerName.textContent = 'You';
+        } else {
+            this.speakerAvatar.textContent = '🤖';
+            this.speakerName.textContent = 'AI Assistant';
+        }
+
+        // Clear any existing timeout
+        if (this.speakingTimeout) {
+            clearTimeout(this.speakingTimeout);
+        }
+
+        // Auto-hide after duration (if specified)
+        if (duration) {
+            this.speakingTimeout = setTimeout(() => {
+                this.hideSpeakingIndicator();
+            }, duration);
+        }
+    }
+
+    hideSpeakingIndicator() {
+        console.log('🔇 Hiding speaking indicator');
+        this.speakingIndicator.classList.remove('active');
+        this.currentSpeaker = null;
+        
+        if (this.speakingTimeout) {
+            clearTimeout(this.speakingTimeout);
+            this.speakingTimeout = null;
+        }
+    }
+
+    /* ====================================
+       AUTO-DISCONNECT - FIXED!
+       ==================================== */
+
+    checkGoodbyeIntent(text) {
+        const lowerText = text.toLowerCase().trim();
+        
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`🔍 CHECKING GOODBYE INTENT`);
+        console.log(`   User said: "${text}"`);
+        console.log(`   Normalized: "${lowerText}"`);
+        
+        // Check each keyword
+        let matchedKeyword = null;
+        for (const keyword of this.goodbyeKeywords) {
+            if (lowerText.includes(keyword.toLowerCase())) {
+                matchedKeyword = keyword;
+                break;
+            }
+        }
+        
+        if (matchedKeyword) {
+            console.log(`   ✅ MATCH FOUND: "${matchedKeyword}"`);
+            console.log(`   👋 Initiating auto-disconnect...`);
+            console.log(`${'='.repeat(60)}\n`);
+            
+            // Show farewell message
+            this.showFarewellMessage();
+            
+            // Disconnect after delay
+            setTimeout(() => {
+                console.log('📞 Auto-disconnecting now...');
+                this.disconnect(true);
+            }, 3000);
+        } else {
+            console.log(`   ❌ No goodbye keywords detected`);
+            console.log(`${'='.repeat(60)}\n`);
+        }
+    }
+
+    showFarewellMessage() {
+        console.log('👋 Showing farewell message');
+        
+        // Show toast notification
+        const toastText = this.autoDisconnectToast.querySelector('.toast-text p');
+        toastText.textContent = 'You were talking to "AI Assistant". Have a great day!';
+        
+        this.autoDisconnectToast.classList.add('show');
+        
+        // Hide after 5 seconds
+        setTimeout(() => {
+            this.autoDisconnectToast.classList.remove('show');
+        }, 5000);
+
+        // Add to transcription
+        const farewellDiv = document.createElement('div');
+        farewellDiv.className = 'transfer-notification';
+        farewellDiv.innerHTML = `
+            <div class="transfer-icon">👋</div>
+            <div class="transfer-text">
+                <strong>Call Ending</strong>
+                <p>Thank you for using our service! The call will disconnect shortly.</p>
+            </div>
+        `;
+        
+        this.transcriptionContent.appendChild(farewellDiv);
+        this.transcriptionContent.scrollTop = this.transcriptionContent.scrollHeight;
+    }
+
+    /* ====================================
+       TRANSFER REQUEST
+       ==================================== */
+
     handleTransferRequest(data) {
-        /**
-         * Handle transfer to human agent requests
-         */
         console.log('📞 Transfer request:', data.reason);
         
-        // Show notification
         const notification = document.createElement('div');
         notification.className = 'transfer-notification';
         notification.innerHTML = `
@@ -316,46 +534,11 @@ class EVChargingApp {
         
         this.transcriptionContent.appendChild(notification);
         this.transcriptionContent.scrollTop = this.transcriptionContent.scrollHeight;
-        
-        // You could add actual transfer logic here
-        // e.g., open a modal, initiate SIP transfer, etc.
     }
 
-    createTranscriptMessage(role, text, language, isFinal) {
-        /**
-         * Create a chat-like message bubble
-         */
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `transcript-message ${role}`;
-        messageDiv.dataset.role = role;
-        messageDiv.dataset.final = isFinal ? 'true' : 'false';
-        messageDiv.dataset.language = language || 'en';
-
-        const timeString = isFinal ? this.getCurrentTimeString() : '';
-        const partialClass = !isFinal ? 'partial' : '';
-
-        // Icon for role
-        const icon = role === 'user' ? '👤' : '🤖';
-
-        messageDiv.innerHTML = `
-            <div class="message-avatar">${icon}</div>
-            <div class="message-content">
-                <div class="message-header">
-                    <span class="message-label">${role === 'user' ? 'You' : 'Assistant'}</span>
-                    <span class="message-time">${timeString}</span>
-                </div>
-                <div class="message-text ${partialClass}">${this.escapeHtml(text)}</div>
-            </div>
-        `;
-
-        return messageDiv;
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+    /* ====================================
+       AUDIO SETUP
+       ==================================== */
 
     async setupLocalAudio() {
         try {
@@ -378,8 +561,12 @@ class EVChargingApp {
         }
     }
 
-    async disconnect() {
-        console.log('🔌 Disconnecting...');
+    /* ====================================
+       DISCONNECT
+       ==================================== */
+
+    async disconnect(isAutoDisconnect = false) {
+        console.log(isAutoDisconnect ? '👋 Auto-disconnecting...' : '🔌 Manual disconnect...');
         
         if (this.localAudioTrack) {
             try {
@@ -399,8 +586,7 @@ class EVChargingApp {
     handleDisconnection() {
         this.isConnected = false;
         this.updateStatus('disconnected', 'Disconnected');
-        this.connectionInfo.innerHTML = '<p>Click "Connect" to start talking with the voice assistant</p>';
-        this.waveContainer.classList.remove('active');
+        this.connectionInfo.innerHTML = '<p>👆 Click "Connect" to start your voice conversation</p>';
 
         this.connectBtn.disabled = false;
         this.disconnectBtn.disabled = true;
@@ -417,9 +603,16 @@ class EVChargingApp {
         this.room = null;
         this.currentUserPartial = null;
         this.currentAssistantPartial = null;
+        this.currentSpeaker = null;
         
-        console.log('✓ Disconnected');
+        this.hideSpeakingIndicator();
+        
+        console.log('✓ Disconnected and cleaned up');
     }
+
+    /* ====================================
+       MUTE TOGGLE
+       ==================================== */
 
     async toggleMute() {
         if (!this.localAudioTrack) return;
@@ -447,6 +640,10 @@ class EVChargingApp {
         }
     }
 
+    /* ====================================
+       UTILITY FUNCTIONS
+       ==================================== */
+
     updateStatus(status, text) {
         this.statusText.textContent = text;
         this.statusDot.className = 'status-dot';
@@ -466,11 +663,6 @@ class EVChargingApp {
         });
     }
 
-    detectLanguage(text) {
-        const hindiRegex = /[\u0900-\u097F]/;
-        return hindiRegex.test(text) ? 'hi' : 'en';
-    }
-
     updateLanguageIndicator(language) {
         const badge = this.languageIndicator.querySelector('.lang-badge');
         if (language === 'hi') {
@@ -482,29 +674,48 @@ class EVChargingApp {
         }
     }
 
-    clearTranscripts() {
-        if (this.transcripts.length === 0) return;
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
-        if (confirm('Are you sure you want to clear all transcripts?')) {
+    clearTranscripts() {
+        if (this.transcripts.length === 0 && 
+            !this.transcriptionContent.querySelector('.transcript-message')) {
+            return;
+        }
+
+        if (confirm('Are you sure you want to clear the conversation history?')) {
             this.transcripts = [];
             this.currentUserPartial = null;
             this.currentAssistantPartial = null;
             this.transcriptionContent.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon">💬</div>
-                    <p>Conversation transcription will appear here</p>
+                    <p>Your conversation will appear here</p>
+                    <p class="empty-subtitle">Connect to start talking with our AI assistant</p>
                 </div>
             `;
-            console.log('🗑️ Transcripts cleared');
+            console.log('🗑️ Conversation cleared');
         }
     }
 }
 
-// Initialize app when DOM is loaded
+/* ====================================
+   INITIALIZE APP
+   ==================================== */
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('='.repeat(80));
-    console.log('EV CHARGING VOICE ASSISTANT - PRODUCTION MODE');
+    console.log('EV CHARGING VOICE ASSISTANT - FIXED & DEBUGGED VERSION');
     console.log('='.repeat(80));
+    console.log('');
+    console.log('🐛 DEBUG MODE ENABLED');
+    console.log('   - Detailed logging for transcriptions');
+    console.log('   - Speaking indicator debugging');
+    console.log('   - Auto-disconnect keyword matching');
+    console.log('');
     
     if (typeof LivekitClient === 'undefined') {
         console.error('❌ LivekitClient not loaded!');
@@ -512,8 +723,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    console.log('✓ LivekitClient loaded');
+    console.log('✓ LivekitClient loaded successfully');
+    console.log('  Available:', Object.keys(LivekitClient).slice(0, 5).join(', '), '...');
+    console.log('');
+    
     window.app = new EVChargingApp();
-    console.log('✓ App ready');
+    
+    console.log('✓ App initialized and ready');
+    console.log('');
+    console.log('📝 TROUBLESHOOTING TIPS:');
+    console.log('   1. Connect to the room');
+    console.log('   2. Speak into your microphone');
+    console.log('   3. Watch console for "📦 DATA RECEIVED" messages');
+    console.log('   4. If no data received, check backend is running');
+    console.log('   5. Say "goodbye" or "thank you" to test auto-disconnect');
+    console.log('');
     console.log('='.repeat(80));
 });
