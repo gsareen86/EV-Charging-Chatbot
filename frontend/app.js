@@ -1,6 +1,10 @@
 /**
- * EV Charging Voice Assistant - ENHANCED DEBUG Frontend
- * Includes comprehensive logging to diagnose audio issues
+ * EV Charging Voice Assistant - PRODUCTION Frontend
+ * Features:
+ * - Real-time streaming transcriptions (partial + final)
+ * - Chat-like interface with proper message bubbles
+ * - Proper sentence completion handling
+ * - Transfer request notifications
  */
 
 class EVChargingApp {
@@ -10,11 +14,15 @@ class EVChargingApp {
         this.isMuted = false;
         this.localAudioTrack = null;
         this.transcripts = [];
+        
+        // Track current partial transcriptions to update them
+        this.currentUserPartial = null;
+        this.currentAssistantPartial = null;
 
         this.initializeElements();
         this.attachEventListeners();
         
-        console.log('🚀 EVChargingApp initialized');
+        console.log('🚀 EV Charging App initialized');
     }
 
     initializeElements() {
@@ -77,49 +85,36 @@ class EVChargingApp {
 
     async connect(roomName, participantName) {
         try {
-            console.log('🔌 Starting connection process...');
+            console.log('🔌 Starting connection...');
             this.updateStatus('connecting', 'Connecting...');
             this.connectionInfo.innerHTML = '<p>Connecting to voice assistant...</p>';
 
-            // Get access token from backend
-            console.log('🎫 Requesting access token...');
+            // Get access token
             const connectionConfig = await this.getAccessToken(roomName, participantName);
             const { token, url: livekitUrl, deployment } = connectionConfig;
-            console.log(`✓ Token received for ${deployment} deployment`);
-            console.log(`✓ LiveKit URL: ${livekitUrl}`);
+            console.log(`✓ Token received`);
 
             // Initialize LiveKit room
-            console.log('🏠 Creating LiveKit room...');
             this.room = new LivekitClient.Room({
                 adaptiveStream: true,
                 dynacast: true,
             });
-            console.log('✓ Room created');
 
-            // Set up event listeners BEFORE connecting
+            // Set up event listeners
             this.setupRoomEventListeners();
 
             // Connect to the room
-            console.log('🔗 Connecting to room...');
             await this.room.connect(livekitUrl, token);
             console.log('✓ Connected to room');
-            console.log(`  - Room name: ${this.room.name}`);
-            console.log(`  - Room SID: ${this.room.sid}`);
-            console.log(`  - Local participant: ${this.room.localParticipant.identity}`);
-            console.log(`  - Remote participants: ${this.room.remoteParticipants.size}`);
 
-            // Set up local audio track
-            console.log('🎤 Setting up local audio...');
+            // Set up local audio
             await this.setupLocalAudio();
 
             this.isConnected = true;
             this.updateStatus('connected', 'Connected');
             this.connectionInfo.innerHTML = `
                 <p>✓ Connected! Start speaking to interact with the assistant.</p>
-                <p><strong>Deployment:</strong> ${deployment === 'cloud' ? 'LiveKit Cloud' : 'Local LiveKit Server'}</p>
-                <p><strong>Server:</strong> ${livekitUrl}</p>
-                <p><strong>Room:</strong> ${this.room.name}</p>
-                <p><strong>Your ID:</strong> ${this.room.localParticipant.identity}</p>
+                <p class="info-detail"><strong>Room:</strong> ${this.room.name}</p>
             `;
             this.waveContainer.classList.add('active');
 
@@ -128,211 +123,259 @@ class EVChargingApp {
             this.disconnectBtn.disabled = false;
             this.muteBtn.disabled = false;
 
-            console.log('✅ Connection complete! You can now speak.');
+            console.log('✅ Ready to interact!');
 
         } catch (error) {
             console.error('❌ Connection error:', error);
             this.updateStatus('disconnected', 'Connection Failed');
             this.connectionInfo.innerHTML = `<p style="color: var(--danger-color);">Connection failed: ${error.message}</p>`;
-
-            if (error.message.includes('token')) {
-                alert('Failed to get access token. Please make sure the backend server is running.');
-            } else if (error.message.includes('connect')) {
-                alert('Failed to connect to the LiveKit server. Please ensure the configured LiveKit deployment is reachable.');
-            }
+            alert('Connection failed. Please check that backend and LiveKit servers are running.');
         }
     }
 
     async getAccessToken(roomName, participantName) {
-        try {
-            let apiBaseUrl = window.location.origin;
-            if (!apiBaseUrl.startsWith('http')) {
-                apiBaseUrl = 'http://localhost:5000';
-            }
-
-            console.log(`Fetching token from: ${apiBaseUrl}/api/token`);
-            const response = await fetch(`${apiBaseUrl}/api/token`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    roomName: roomName,
-                    participantName: participantName,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to get access token');
-            }
-
-            const data = await response.json();
-            return data;
-
-        } catch (error) {
-            console.error('Token fetch error:', error);
-            throw new Error('Cannot fetch token. Please ensure the FastAPI server is running.');
+        let apiBaseUrl = window.location.origin;
+        if (!apiBaseUrl.startsWith('http')) {
+            apiBaseUrl = 'http://localhost:5000';
         }
+
+        const response = await fetch(`${apiBaseUrl}/api/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roomName, participantName }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to get access token');
+        }
+
+        return await response.json();
     }
 
     setupRoomEventListeners() {
-        console.log('📡 Setting up room event listeners...');
+        console.log('📡 Setting up event listeners...');
 
-        // Track published
-        this.room.on(LivekitClient.RoomEvent.TrackPublished, (publication, participant) => {
-            console.log('📢 Track published:', {
-                participant: participant.identity,
-                trackSid: publication.trackSid,
-                kind: publication.kind,
-                source: publication.source,
-            });
-        });
-
-        // Track subscribed
+        // Track subscribed - play agent audio
         this.room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-            console.log('🎧 Track subscribed:', {
-                participant: participant.identity,
-                trackSid: track.sid,
-                kind: track.kind,
-            });
-
+            console.log(`🎧 Track subscribed from ${participant.identity}`);
+            
             if (track.kind === LivekitClient.Track.Kind.Audio) {
-                console.log('🔊 AUDIO TRACK SUBSCRIBED - Agent audio will play');
                 const audioElement = track.attach();
                 audioElement.autoplay = true;
                 document.body.appendChild(audioElement);
-                console.log('✓ Audio element attached to DOM');
+                console.log('✓ Agent audio element attached');
             }
         });
 
         // Track unsubscribed
-        this.room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
-            console.log('🔇 Track unsubscribed:', {
-                participant: participant.identity,
-                trackSid: track.sid,
-            });
+        this.room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
             track.detach().forEach(element => element.remove());
         });
 
-        // Data received (for transcriptions)
+        // Data received - Handle transcriptions and transfer requests
         this.room.on(LivekitClient.RoomEvent.DataReceived, (payload, participant) => {
-            console.log('📦 Data received from', participant?.identity || 'unknown');
-            
             const decoder = new TextDecoder();
             const data = JSON.parse(decoder.decode(payload));
-            console.log('Data content:', data);
+            
+            console.log('📦 Data received:', data.type, data);
 
             if (data.type === 'transcription') {
-                const roleFromPayload = data.role || (participant?.identity === this.room?.localParticipant?.identity ? 'user' : 'assistant');
-                this.addTranscript(data.text, data.isFinal, roleFromPayload, data.language);
+                this.handleTranscription(data);
+            } else if (data.type === 'transfer_request') {
+                this.handleTransferRequest(data);
             }
         });
 
-        // Participant connected
+        // Participant events
         this.room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
-            console.log('👤 Participant connected:', {
-                identity: participant.identity,
-                sid: participant.sid,
-                isAgent: participant.identity.includes('agent') || participant.identity.includes('assistant'),
-            });
+            console.log(`👤 Participant connected: ${participant.identity}`);
         });
 
-        // Participant disconnected
-        this.room.on(LivekitClient.RoomEvent.ParticipantDisconnected, (participant) => {
-            console.log('👋 Participant disconnected:', participant.identity);
-        });
-
-        // Disconnected
         this.room.on(LivekitClient.RoomEvent.Disconnected, (reason) => {
-            console.log('🔌 Disconnected from room:', reason);
+            console.log('🔌 Disconnected:', reason);
             this.handleDisconnection();
         });
 
-        // Connection quality changed
-        this.room.on(LivekitClient.RoomEvent.ConnectionQualityChanged, (quality, participant) => {
-            console.log('📶 Connection quality:', {
-                participant: participant.identity,
-                quality: quality,
+        console.log('✓ Event listeners configured');
+    }
+
+    handleTranscription(data) {
+        /**
+         * Handle real-time transcription data
+         * - Updates partial transcripts in-place
+         * - Finalizes complete sentences
+         */
+        const { role, text, isFinal, language } = data;
+        
+        if (!text || text.trim() === '') return;
+
+        // Update language indicator
+        this.updateLanguageIndicator(language || 'en');
+
+        // Remove empty state if present
+        const emptyState = this.transcriptionContent.querySelector('.empty-state');
+        if (emptyState) {
+            emptyState.remove();
+        }
+
+        if (role === 'user') {
+            this.handleUserTranscript(text, isFinal, language);
+        } else if (role === 'assistant') {
+            this.handleAssistantTranscript(text, isFinal, language);
+        }
+
+        // Auto-scroll to bottom
+        this.transcriptionContent.scrollTop = this.transcriptionContent.scrollHeight;
+    }
+
+    handleUserTranscript(text, isFinal, language) {
+        /**
+         * Handle user transcriptions with partial updates
+         */
+        if (!isFinal) {
+            // Update or create partial transcript
+            if (this.currentUserPartial) {
+                // Update existing partial
+                const messageText = this.currentUserPartial.querySelector('.message-text');
+                messageText.textContent = text;
+                messageText.classList.add('partial');
+            } else {
+                // Create new partial message
+                const messageDiv = this.createTranscriptMessage('user', text, language, false);
+                this.transcriptionContent.appendChild(messageDiv);
+                this.currentUserPartial = messageDiv;
+            }
+        } else {
+            // Final transcript - update or create
+            if (this.currentUserPartial) {
+                // Update the partial to final
+                const messageText = this.currentUserPartial.querySelector('.message-text');
+                messageText.textContent = text;
+                messageText.classList.remove('partial');
+                
+                const timeEl = this.currentUserPartial.querySelector('.message-time');
+                timeEl.textContent = this.getCurrentTimeString();
+                
+                this.currentUserPartial.dataset.final = 'true';
+                this.currentUserPartial = null;
+            } else {
+                // Create new final message
+                const messageDiv = this.createTranscriptMessage('user', text, language, true);
+                this.transcriptionContent.appendChild(messageDiv);
+            }
+            
+            // Save to history
+            this.transcripts.push({
+                role: 'user',
+                text: text,
+                timestamp: new Date(),
+                language: language
             });
-        });
 
-        // Media devices error
-        this.room.on(LivekitClient.RoomEvent.MediaDevicesError, (error) => {
-            console.error('🎤❌ Media devices error:', error);
-            alert('Microphone error: ' + error.message);
-        });
+            console.log('💬 User (final):', text);
+        }
+    }
 
-        console.log('✓ Event listeners set up');
+    handleAssistantTranscript(text, isFinal, language) {
+        /**
+         * Handle assistant transcriptions (usually only final)
+         */
+        if (isFinal) {
+            // Create or update final assistant message
+            const messageDiv = this.createTranscriptMessage('assistant', text, language, true);
+            this.transcriptionContent.appendChild(messageDiv);
+            
+            // Save to history
+            this.transcripts.push({
+                role: 'assistant',
+                text: text,
+                timestamp: new Date(),
+                language: language
+            });
+
+            console.log('🤖 Assistant:', text);
+        }
+    }
+
+    handleTransferRequest(data) {
+        /**
+         * Handle transfer to human agent requests
+         */
+        console.log('📞 Transfer request:', data.reason);
+        
+        // Show notification
+        const notification = document.createElement('div');
+        notification.className = 'transfer-notification';
+        notification.innerHTML = `
+            <div class="transfer-icon">📞</div>
+            <div class="transfer-text">
+                <strong>Transfer Requested</strong>
+                <p>${data.reason}</p>
+            </div>
+        `;
+        
+        this.transcriptionContent.appendChild(notification);
+        this.transcriptionContent.scrollTop = this.transcriptionContent.scrollHeight;
+        
+        // You could add actual transfer logic here
+        // e.g., open a modal, initiate SIP transfer, etc.
+    }
+
+    createTranscriptMessage(role, text, language, isFinal) {
+        /**
+         * Create a chat-like message bubble
+         */
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `transcript-message ${role}`;
+        messageDiv.dataset.role = role;
+        messageDiv.dataset.final = isFinal ? 'true' : 'false';
+        messageDiv.dataset.language = language || 'en';
+
+        const timeString = isFinal ? this.getCurrentTimeString() : '';
+        const partialClass = !isFinal ? 'partial' : '';
+
+        // Icon for role
+        const icon = role === 'user' ? '👤' : '🤖';
+
+        messageDiv.innerHTML = `
+            <div class="message-avatar">${icon}</div>
+            <div class="message-content">
+                <div class="message-header">
+                    <span class="message-label">${role === 'user' ? 'You' : 'Assistant'}</span>
+                    <span class="message-time">${timeString}</span>
+                </div>
+                <div class="message-text ${partialClass}">${this.escapeHtml(text)}</div>
+            </div>
+        `;
+
+        return messageDiv;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     async setupLocalAudio() {
         try {
-            console.log('🎤 Requesting microphone access...');
+            console.log('🎤 Setting up microphone...');
             
-            // Check if browser supports getUserMedia
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                throw new Error('Your browser does not support microphone access');
-            }
-
-            // Create local audio track
-            console.log('Creating local audio track...');
             this.localAudioTrack = await LivekitClient.createLocalAudioTrack({
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true,
             });
-            console.log('✓ Local audio track created:', {
-                sid: this.localAudioTrack.sid,
-                enabled: this.localAudioTrack.isEnabled,
-                muted: this.localAudioTrack.isMuted,
-            });
+            console.log('✓ Audio track created');
 
-            // Publish the track to the room
-            console.log('📤 Publishing audio track to room...');
-            const publication = await this.room.localParticipant.publishTrack(this.localAudioTrack);
-            console.log('✓ Audio track published:', {
-                trackSid: publication.trackSid,
-                kind: publication.kind,
-                source: publication.source,
-            });
-
-            // Log audio level to verify microphone is working
-            this.monitorAudioLevel();
-
-            console.log('✅ Local audio setup complete');
+            await this.room.localParticipant.publishTrack(this.localAudioTrack);
+            console.log('✓ Audio track published');
 
         } catch (error) {
-            console.error('❌ Failed to set up local audio:', error);
-            alert(`Failed to access microphone: ${error.message}\n\nPlease check:\n1. Microphone permissions in browser\n2. Microphone is not used by another application\n3. Using HTTPS or localhost`);
+            console.error('❌ Microphone setup failed:', error);
+            alert(`Failed to access microphone: ${error.message}\n\nPlease grant microphone permissions and try again.`);
             throw error;
         }
-    }
-
-    monitorAudioLevel() {
-        // Monitor audio level to confirm microphone is working
-        let lastLogTime = 0;
-        const logInterval = 2000; // Log every 2 seconds
-
-        const checkAudio = () => {
-            if (!this.localAudioTrack || !this.isConnected) return;
-
-            const now = Date.now();
-            if (now - lastLogTime >= logInterval) {
-                // The track has an audioLevel property that we can check
-                console.log('🎤 Microphone status:', {
-                    enabled: this.localAudioTrack.isEnabled,
-                    muted: this.localAudioTrack.isMuted,
-                    // Note: audioLevel might not be available on all track types
-                });
-                lastLogTime = now;
-            }
-
-            if (this.isConnected) {
-                requestAnimationFrame(checkAudio);
-            }
-        };
-
-        checkAudio();
     }
 
     async disconnect() {
@@ -340,18 +383,14 @@ class EVChargingApp {
         
         if (this.localAudioTrack) {
             try {
-                console.log('📤 Unpublishing local audio track...');
                 await this.room.localParticipant.unpublishTrack(this.localAudioTrack);
-                console.log('✓ Track unpublished');
             } catch (error) {
-                console.warn('Unable to unpublish local audio track cleanly:', error);
+                console.warn('Error unpublishing track:', error);
             }
         }
 
         if (this.room) {
-            console.log('👋 Disconnecting from room...');
             await this.room.disconnect();
-            console.log('✓ Disconnected');
         }
         
         this.handleDisconnection();
@@ -376,7 +415,10 @@ class EVChargingApp {
         }
 
         this.room = null;
-        console.log('✓ Cleanup complete');
+        this.currentUserPartial = null;
+        this.currentAssistantPartial = null;
+        
+        console.log('✓ Disconnected');
     }
 
     async toggleMute() {
@@ -385,15 +427,12 @@ class EVChargingApp {
         this.isMuted = !this.isMuted;
 
         if (this.isMuted) {
-            console.log('🔇 Muting microphone');
             await this.localAudioTrack.mute();
         } else {
-            console.log('🔊 Unmuting microphone');
             await this.localAudioTrack.unmute();
         }
 
         this.updateMuteButton();
-        console.log(`Microphone ${this.isMuted ? 'muted' : 'unmuted'}`);
     }
 
     updateMuteButton() {
@@ -417,63 +456,6 @@ class EVChargingApp {
         } else if (status === 'connecting') {
             this.statusDot.classList.add('connecting');
         }
-    }
-
-    addTranscript(text, isFinal, role, languageHint) {
-        if (!text) return;
-
-        console.log(`📝 Adding transcript: [${role}] "${text}" (final: ${isFinal})`);
-
-        const language = languageHint || this.detectLanguage(text);
-        this.updateLanguageIndicator(language);
-
-        const emptyState = this.transcriptionContent.querySelector('.empty-state');
-        if (emptyState) {
-            emptyState.remove();
-        }
-
-        const lastMessage = this.transcriptionContent.lastElementChild;
-
-        if (lastMessage && lastMessage.dataset.role === role && lastMessage.dataset.final !== 'true') {
-            const messageText = lastMessage.querySelector('.message-text');
-            messageText.textContent = text;
-
-            if (isFinal) {
-                lastMessage.dataset.final = 'true';
-                const timeEl = lastMessage.querySelector('.message-time');
-                timeEl.textContent = this.getCurrentTimeString();
-                this.transcripts.push({ role, text, timestamp: new Date(), language });
-            }
-
-            return;
-        }
-
-        const messageDiv = this.createTranscriptMessage(role, text, language, isFinal);
-        this.transcriptionContent.appendChild(messageDiv);
-
-        if (isFinal) {
-            this.transcripts.push({ role, text, timestamp: new Date(), language });
-        }
-
-        this.transcriptionContent.scrollTop = this.transcriptionContent.scrollHeight;
-    }
-
-    createTranscriptMessage(role, text, language, isFinal) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `transcript-message ${role}`;
-        messageDiv.dataset.role = role;
-        messageDiv.dataset.final = isFinal ? 'true' : 'false';
-        messageDiv.dataset.language = language;
-
-        const timeString = isFinal ? this.getCurrentTimeString() : '';
-
-        messageDiv.innerHTML = `
-            <div class="message-label">${role === 'user' ? 'You' : 'Assistant'}</div>
-            <div class="message-text">${text}</div>
-            <div class="message-time">${timeString}</div>
-        `;
-
-        return messageDiv;
     }
 
     getCurrentTimeString() {
@@ -505,6 +487,8 @@ class EVChargingApp {
 
         if (confirm('Are you sure you want to clear all transcripts?')) {
             this.transcripts = [];
+            this.currentUserPartial = null;
+            this.currentAssistantPartial = null;
             this.transcriptionContent.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon">💬</div>
@@ -516,25 +500,20 @@ class EVChargingApp {
     }
 }
 
-// Initialize the app when DOM is loaded
+// Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     console.log('='.repeat(80));
-    console.log('EV CHARGING VOICE ASSISTANT - DEBUG MODE');
+    console.log('EV CHARGING VOICE ASSISTANT - PRODUCTION MODE');
     console.log('='.repeat(80));
     
-    // Check if LiveKit is loaded
     if (typeof LivekitClient === 'undefined') {
-        console.error('❌ LivekitClient library failed to load!');
-        alert('Error: LivekitClient library failed to load. Please check your internet connection and refresh the page.');
+        console.error('❌ LivekitClient not loaded!');
+        alert('Error: LiveKit client library failed to load. Please refresh the page.');
         return;
     }
 
-    console.log('✓ LivekitClient loaded:', LivekitClient.version || 'version unknown');
-    
+    console.log('✓ LivekitClient loaded');
     window.app = new EVChargingApp();
-    console.log('✓ App initialized');
-    console.log('='.repeat(80));
-    console.log('Ready! Click "Connect" to start.');
-    console.log('All events will be logged to this console.');
+    console.log('✓ App ready');
     console.log('='.repeat(80));
 });
