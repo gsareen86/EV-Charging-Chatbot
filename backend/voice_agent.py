@@ -28,7 +28,7 @@ from livekit.agents import (
     RunContext,
 )
 from livekit.agents.voice import events as voice_events
-from livekit.plugins import noise_cancellation, silero, openai as oai
+from livekit.plugins import noise_cancellation, silero, openai as oai, cartesia
 from livekit import rtc
 
 from vector_search import VectorSearch
@@ -235,10 +235,21 @@ async def entrypoint(ctx: JobContext):
             model=os.getenv("OPENAI_LLM_MODEL", "gpt-4o-mini"),
             # temperature=0.2,
         ),
-        tts=oai.TTS(
-            model=os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts"),
-            voice="alloy",
-            speed=1.0,
+        # tts=oai.TTS(
+        #     model=os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts"),
+        #     voice="alloy",
+        #     speed=1.0,
+        # ),
+        tts = cartesia.TTS(
+            voice="faf0731e-dfb9-4cfc-8119-259a79b27e12",          # pick any installed Cartesia voice
+            # voice=os.getenv("CARTESIA_VOICE"),          # pick any installed Cartesia voice
+            model=os.getenv("CARTESIA_TTS_MODEL"),
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            language=os.getenv("CARTESIA_LANGUAGE"),         # IMPORTANT: stream audio while text arrives
+            # sample_rate=24000,
+            # encoding="pcm_s16le",     # LiveKit-friendly raw PCM
+            # speed=1.05,              # bump to 1.05–1.1 if you prefer
+            # http_session=_http_session
         ),
         turn_detection="vad",
         vad=ctx.proc.userdata["vad"],
