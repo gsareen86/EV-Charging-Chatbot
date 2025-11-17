@@ -17,79 +17,117 @@
                 <div class="logo-icon">⚡</div>
                 <div class="logo-text">
                     <h1>EV Charging Assistant</h1>
-                    <p class="tagline">24x7 Voice Support for Delivery Personnel</p>
+                    <p class="tagline">AI-Powered 24x7 Voice Support</p>
                 </div>
             </div>
-            <div class="connection-status" id="connectionStatus">
-                <span class="status-dot" id="statusDot"></span>
-                <span class="status-text" id="statusText">Disconnected</span>
+            <div class="header-controls">
+                <!-- Theme Toggle -->
+                <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+                    <span class="theme-icon">🌙</span>
+                </button>
+                <!-- Connection Status -->
+                <div class="connection-status" id="connectionStatus">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span class="status-text" id="statusText">Disconnected</span>
+                </div>
             </div>
         </header>
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Voice Interface Card -->
-            <div class="voice-card">
-                <div class="wave-container" id="waveContainer">
-                    <div class="wave"></div>
-                    <div class="wave"></div>
-                    <div class="wave"></div>
-                </div>
+            
+            <!-- Compact Voice Controls -->
+            <div class="voice-controls-compact">
+                <button class="btn-primary btn-compact" id="connectBtn">
+                    <span class="btn-icon">🎤</span>
+                    <span class="btn-text">Connect</span>
+                </button>
 
-                <div class="voice-controls">
-                    <button class="btn-primary" id="connectBtn">
-                        <span class="btn-icon">🎤</span>
-                        <span class="btn-text">Connect</span>
-                    </button>
+                <button class="btn-secondary btn-compact" id="muteBtn" disabled>
+                    <span class="btn-icon">🔊</span>
+                    <span class="btn-text">Mute</span>
+                </button>
 
-                    <button class="btn-secondary" id="muteBtn" disabled>
-                        <span class="btn-icon">🔊</span>
-                        <span class="btn-text">Mute</span>
-                    </button>
-
-                    <button class="btn-danger" id="disconnectBtn" disabled>
-                        <span class="btn-icon">📞</span>
-                        <span class="btn-text">Disconnect</span>
-                    </button>
-                </div>
-
-                <div class="connection-info" id="connectionInfo">
-                    <p>Click "Connect" to start talking with the voice assistant</p>
-                </div>
+                <button class="btn-danger btn-compact" id="disconnectBtn" disabled>
+                    <span class="btn-icon">📞</span>
+                    <span class="btn-text">End Call</span>
+                </button>
             </div>
 
-            <!-- Transcription Section -->
+            <div class="connection-info-compact" id="connectionInfo">
+                <p>👆 Click "Connect" to start your voice conversation</p>
+            </div>
+
+            <!-- Enhanced Transcription Section with Wave Indicator -->
             <div class="transcription-card">
                 <div class="transcription-header">
-                    <h2>Live Transcription</h2>
-                    <div class="language-indicator" id="languageIndicator">
-                        <span class="lang-badge">EN</span>
+                    <div class="header-left">
+                        <h2>💬 Live Conversation</h2>
+                        <div class="participant-info" id="participantInfo">
+                            <span class="participant-badge" id="userBadge">
+                                <span class="badge-icon">👤</span>
+                                <span class="badge-label">You</span>
+                            </span>
+                            <span class="participant-badge" id="agentBadge">
+                                <span class="badge-icon">🤖</span>
+                                <span class="badge-label">AI Assistant</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="header-right">
+                        <div class="language-indicator" id="languageIndicator">
+                            <span class="lang-badge">EN</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Speaking Indicator with Wave Animation -->
+                <div class="speaking-indicator" id="speakingIndicator">
+                    <div class="speaker-info">
+                        <span class="speaker-avatar" id="speakerAvatar">🤖</span>
+                        <span class="speaker-name" id="speakerName">AI Assistant</span>
+                        <span class="speaker-status">is speaking...</span>
+                    </div>
+                    <div class="wave-bars">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
                     </div>
                 </div>
 
                 <div class="transcription-content" id="transcriptionContent">
                     <div class="empty-state">
                         <div class="empty-icon">💬</div>
-                        <p>Conversation transcription will appear here</p>
+                        <p>Your conversation will appear here</p>
+                        <p class="empty-subtitle">Connect to start talking with our AI assistant</p>
                     </div>
                 </div>
 
-                <button class="btn-clear" id="clearBtn">
-                    Clear Transcript
-                </button>
+                <div class="transcription-footer">
+                    <button class="btn-clear" id="clearBtn">
+                        <span class="btn-icon">🗑️</span>
+                        Clear History
+                    </button>
+                    <div class="auto-disconnect-notice" id="autoDisconnectNotice">
+                        <span class="notice-icon">ℹ️</span>
+                        <span class="notice-text">Call ends automatically when you say goodbye</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Features Section -->
             <div class="features-section">
                 <div class="feature-card">
                     <div class="feature-icon">📍</div>
-                    <h3>Station Locations</h3>
+                    <h3>Station Locator</h3>
                     <p>Find nearest charging stations</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">🔋</div>
-                    <h3>Battery Status</h3>
-                    <p>Check real-time availability</p>
+                    <h3>Real-time Status</h3>
+                    <p>Check battery availability</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">⏰</div>
@@ -97,7 +135,7 @@
                     <p>Always here to help</p>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-icon">🌏</div>
+                    <div class="feature-icon">🌐</div>
                     <h3>Multi-language</h3>
                     <p>Hindi & English support</p>
                 </div>
@@ -106,48 +144,55 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <p>Powered by AI | Optimized with LiveKit</p>
-            <p class="helpline">Helpline: 1800-XXX-XXXX</p>
+            <p>🤖 Powered by AI | ⚡ Optimized with LiveKit</p>
+            <p class="helpline">📞 Helpline: 1800-XXX-XXXX</p>
         </footer>
     </div>
 
     <!-- Connection Modal -->
     <div class="modal" id="connectionModal">
         <div class="modal-content">
-            <h2>Connect to Voice Assistant</h2>
+            <h2>🎙️ Connect to Voice Assistant</h2>
+            <p class="modal-subtitle">Join the conversation with our AI assistant</p>
             <form id="connectionForm">
                 <div class="form-group">
-                    <label for="roomName">Room Name</label>
+                    <label for="roomName">
+                        <span class="label-icon">🏠</span>
+                        Room Name
+                    </label>
                     <input type="text" id="roomName" placeholder="Enter room name" value="ev-charging-room" required>
                 </div>
                 <div class="form-group">
-                    <label for="participantName">Your Name</label>
+                    <label for="participantName">
+                        <span class="label-icon">👤</span>
+                        Your Name
+                    </label>
                     <input type="text" id="participantName" placeholder="Enter your name" required>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
-                    <button type="submit" class="btn-primary">Join Call</button>
+                    <button type="submit" class="btn-primary">
+                        <span class="btn-icon">🚀</span>
+                        Join Call
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Auto-Disconnect Notification -->
+    <div class="notification-toast" id="autoDisconnectToast">
+        <div class="toast-content">
+            <span class="toast-icon">👋</span>
+            <div class="toast-text">
+                <strong>Thank you!</strong>
+                <p>You were talking to "AI Assistant". Have a great day!</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
-    <!-- Using locally served LiveKit client library -->
     <script src="livekit-client.umd.js"></script>
-    <script>
-        // Debug: Log what's available in global scope
-        window.addEventListener('load', () => {
-            console.log('Checking for LivekitClient in global scope...');
-            console.log('window.LivekitClient:', window.LivekitClient);
-            if (window.LivekitClient) {
-                console.log('✅ LivekitClient loaded successfully!');
-                console.log('Available classes:', Object.keys(window.LivekitClient));
-            } else {
-                console.error('❌ LivekitClient library not found');
-            }
-        });
-    </script>
-    <script src="app.js?v=2.4"></script>
+    <script src="app.js"></script>
 </body>
 </html>
