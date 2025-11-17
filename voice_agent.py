@@ -1,15 +1,17 @@
 """
-LiveKit Voice Agent - CORRECTED VERSION
+LiveKit Voice Agent - OPTIMIZED VERSION with LiveKit Best Practices
 Features:
-- Fixed RunContext issues
-- Latency optimizations (preemptive generation, faster turn detection)
-- Proper streaming transcriptions using LiveKit's built-in transcription forwarding
-- Working thinking sounds during tool calls
+- on_user_turn_completed for efficient RAG (no extra LLM round trips)
+- Verbal status updates during RAG lookups
+- Thinking sounds during processing
+- UI status notifications
+- Improved response times
 """
 import asyncio
 import json
 import os
 import logging
+import random
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -20,17 +22,15 @@ from livekit.agents import (
     JobProcess,
     MetricsCollectedEvent,
     RoomInputOptions,
-    RoomOutputOptions,
     WorkerOptions,
     cli,
     metrics,
     llm,
     function_tool,
     RunContext,
-    get_job_context,
     BackgroundAudioPlayer,
+    AudioConfig,
     BuiltinAudioClip,
-    AudioConfig
 )
 from livekit.agents.voice import events as voice_events
 from livekit.plugins import noise_cancellation, silero, openai as oai, cartesia
@@ -50,24 +50,24 @@ LIVEKIT_AGENT_NAME = os.getenv("LIVEKIT_AGENT_NAME", "ev-charging-assistant")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ev-charging-agent")
 
-# System prompts - UPDATED with tool calling instructions
+# Default thinking messages for verbal status updates
+DEFAULT_THINKING_MESSAGES = [
+    "Let me look that up for you...",
+    "One moment while I check our knowledge base...",
+    "I'll find that information for you...",
+    "Just a second while I search...",
+    "Looking into that now...",
+    "Checking our database for you...",
+    "Let me get that information...",
+]
+
+# System prompts - UPDATED to work with on_user_turn_completed
 SYSTEM_PROMPT_EN = """You are a helpful customer service agent for an EV battery charging and swapping service in India.
 You assist hypermarket delivery personnel (HDP) with queries about charging stations, battery swapping, account management, and technical issues.
 
-IMPORTANT INSTRUCTIONS:
-1. For general conversation (greetings, casual chat, simple questions), respond directly without using tools.
-2. ONLY use the 'search_knowledge_base' tool when you need specific information about:
-   - Charging station locations, availability, or details
-   - Battery swapping procedures or policies
-   - Account management or billing
-   - Technical issues or troubleshooting
-   - Company policies or services
-
-3. DO NOT use the tool for:
-   - Greetings (hi, hello, how are you)
-   - General conversation
-   - Questions you can answer with common knowledge
-   - Simple acknowledgments
+IMPORTANT: When you receive additional context in the conversation, use it to answer the user's question accurately.
+If the context says "No relevant information found", respond EXACTLY with:
+"I'm sorry, I don't have information about that in my knowledge base. Would you like me to transfer your call to a human agent who can better assist you?"
 
 CONVERSATION STYLE:
 - Be polite, professional, and empathetic
@@ -81,9 +81,9 @@ Support: 24x7 helpline available at 1800-XXX-XXXX
 
 SYSTEM_PROMPT_HI = """आप भारत में EV बैटरी चार्जिंग और स्वैपिंग सेवा के लिए एक सहायक ग्राहक सेवा एजेंट हैं।
 
-महत्वपूर्ण निर्देश:
-1. सामान्य बातचीत के लिए सीधे उत्तर दें, tools का उपयोग न करें।
-2. केवल 'search_knowledge_base' tool का उपयोग करें जब आपको विशिष्ट जानकारी की आवश्यकता हो।
+महत्वपूर्ण: जब आपको conversation में additional context मिले, तो उसका उपयोग करके उत्तर दें।
+यदि context में "No relevant information found" है, तो कहें:
+"मुझे खेद है, मेरे पास इसके बारे में जानकारी नहीं है। क्या आप चाहेंगे कि मैं आपका कॉल किसी मानव एजेंट को transfer कर दूं?"
 
 बातचीत की शैली:
 - विनम्र और पेशेवर रहें
@@ -94,14 +94,19 @@ SYSTEM_PROMPT_HI = """आप भारत में EV बैटरी चार
 
 class EVChargingAssistant(Agent):
     """
-    EV Charging Voice Assistant with INTELLIGENT RAG using tool calling
-    The LLM decides when to search the knowledge base.
+    EV Charging Voice Assistant with OPTIMIZED RAG using on_user_turn_completed
+    This approach is faster than function tools as it:
+    1. Doesn't require extra LLM round trips
+    2. Injects context directly before LLM generation
+    3. Provides verbal status updates during processing
     """
 
-    def __init__(self):
+    def __init__(self, session: AgentSession, job_context: JobContext):
         """Initialize the assistant with vector search capability"""
         super().__init__(instructions=SYSTEM_PROMPT_EN)
 
+        self.session = session
+        self.job_context = job_context
         self.current_language = 'en'
         
         try:
@@ -112,9 +117,8 @@ class EVChargingAssistant(Agent):
             logger.warning("⚠️  Agent will run without vector search - RAG disabled!")
             self.vector_search = None
 
-        # Add tools - LLM will decide when to call them
+        # Add human handoff tool
         self._tools = [
-            self.search_knowledge_base,
             self.transfer_to_human_agent,
         ]
 
@@ -125,83 +129,133 @@ class EVChargingAssistant(Agent):
                 return 'hi'
         return 'en'
 
-    @function_tool
-    async def search_knowledge_base(
-        self,
-        context: RunContext,
-        query: str
-    ) -> str:
-        """
-        Search the knowledge base for information about EV charging stations, 
-        battery swapping, account management, or technical issues.
-        
-        Use this tool ONLY when you need specific information that you don't already know.
-        DO NOT use this for general conversation or greetings.
-        
-        Args:
-            query: The user's question or search query
-            
-        Returns:
-            Relevant information from the knowledge base, or a message if nothing found
-        """
-        if not self.vector_search:
-            return "Knowledge base is not available. Please use general knowledge to answer."
-        
-        logger.info(f"🔍 RAG TOOL CALLED: Searching for '{query[:100]}...'")
-        
-        # Get the room from JobContext instead of RunContext
+    async def _send_status_to_ui(self, status: str, status_type: str = "searching"):
+        """Send status update to the frontend UI"""
         try:
-            job_ctx = get_job_context()
-            room = job_ctx.room
-            
-            # Send UI status notification
-            await room.local_participant.publish_data(
+            await self.job_context.room.local_participant.publish_data(
                 json.dumps({
                     "type": "status_update",
-                    "status": "Searching knowledge base...",
-                    "status_type": "searching",
+                    "status": status,
+                    "status_type": status_type,
                     "timestamp": asyncio.get_event_loop().time(),
                 }).encode("utf-8"),
                 reliable=True,
             )
+            logger.info(f"📤 Status sent to UI: {status}")
         except Exception as e:
-            logger.warning(f"Failed to send search status: {e}")
+            logger.warning(f"❌ Failed to send status to UI: {e}")
+
+    async def on_user_turn_completed(
+        self, 
+        turn_ctx: llm.ChatContext, 
+        new_message: llm.ChatMessage
+    ) -> None:
+        """
+        OPTIMIZED RAG IMPLEMENTATION using on_user_turn_completed
+        This is called BEFORE the LLM generates a response, allowing us to:
+        1. Perform RAG lookup efficiently
+        2. Inject context directly into the chat
+        3. Provide status updates during processing
+        
+        Key advantages over function tools:
+        - No extra LLM round trips
+        - Faster response times
+        - Direct context injection
+        """
+        
+        if not self.vector_search:
+            return
+        
+        user_text = new_message.text_content() or ""
+        if not user_text.strip():
+            return
+            
+        logger.info(f"🔍 RAG LOOKUP: Processing query: '{user_text[:100]}...'")
         
         # Detect language
-        self.current_language = self.detect_language(query)
+        self.current_language = self.detect_language(user_text)
+        
+        # Create async tasks for:
+        # 1. Verbal status update (after 500ms delay)
+        # 2. UI status notification (immediate)
+        # 3. RAG lookup
+        
+        # Send immediate UI status
+        await self._send_status_to_ui("Searching knowledge base...", "searching")
+        
+        # Create verbal status update task with delay
+        async def _speak_status_update():
+            await asyncio.sleep(0.5)  # Wait 500ms before speaking
+            
+            # Choose a random thinking message
+            thinking_msg = random.choice(DEFAULT_THINKING_MESSAGES)
+            
+            logger.info(f"🗣️  Speaking status update: {thinking_msg}")
+            await self._send_status_to_ui(thinking_msg, "speaking")
+            
+            # Generate brief verbal update
+            await self.session.generate_reply(
+                instructions=f"""Say this exact message briefly: "{thinking_msg}" 
+                Be very brief and natural.""",
+                allow_interruptions=False,
+            )
+        
+        status_task = asyncio.create_task(_speak_status_update())
         
         try:
             # Perform the RAG lookup
             results = self.vector_search.get_context_for_llm(
-                query=query,
+                query=user_text,
                 language=self.current_language,
                 top_k=3
             )
             
-            # Send completion status
-            try:
-                await room.local_participant.publish_data(
-                    json.dumps({
-                        "type": "status_update",
-                        "status": "Search complete",
-                        "status_type": "complete",
-                        "timestamp": asyncio.get_event_loop().time(),
-                    }).encode("utf-8"),
-                    reliable=True,
-                )
-            except Exception as e:
-                logger.warning(f"Failed to send completion status: {e}")
+            # Cancel status update if search completed quickly
+            if not status_task.done():
+                status_task.cancel()
+                try:
+                    await status_task
+                except asyncio.CancelledError:
+                    pass
+            
+            # Send completion status to UI
+            await self._send_status_to_ui("Search complete", "complete")
             
             if results and len(results.strip()) > 0:
                 logger.info(f"✅ RAG SUCCESS: Found context ({len(results)} chars)")
-                return f"Here is relevant information from our knowledge base:\n\n{results}\n\nUse this information to answer the user's question accurately."
+                
+                # Inject context DIRECTLY into the chat context
+                # This message is used by the LLM but not spoken to the user
+                turn_ctx.add_message(
+                    role="assistant",
+                    content=f"""RELEVANT INFORMATION FROM KNOWLEDGE BASE:
+{results}
+
+Use this information to answer the user's question accurately."""
+                )
+                
+                logger.info("✓ Context injected into chat for LLM generation")
             else:
                 logger.info("⚠️  No relevant information found")
-                return "I couldn't find specific information about that in our knowledge base. I can either try to help with general knowledge, or transfer you to a human agent for more detailed assistance."
+                
+                # Inform the LLM that no context was found
+                turn_ctx.add_message(
+                    role="assistant",
+                    content="No relevant information found in the knowledge base for this query. Offer to transfer to human agent."
+                )
                 
         except Exception as e:
             logger.error(f"❌ Error in RAG lookup: {e}")
-            return f"I encountered an error while searching. Error: {str(e)}. I can transfer you to a human agent if you need assistance."
+            
+            # Cancel status update if there was an error
+            if not status_task.done():
+                status_task.cancel()
+                try:
+                    await status_task
+                except asyncio.CancelledError:
+                    pass
+            
+            await self._send_status_to_ui("Search failed", "error")
 
     @function_tool
     async def transfer_to_human_agent(
@@ -209,33 +263,38 @@ class EVChargingAssistant(Agent):
         context: RunContext,
         reason: str = "User requested human assistance"
     ) -> str:
-        """Transfer the call to a human agent."""
+        """
+        Transfer the call to a human agent.
+        
+        Args:
+            reason: Reason for the transfer
+            
+        Returns:
+            Confirmation message
+        """
         logger.info(f"📞 Transferring to human agent. Reason: {reason}")
         
+        # Publish transfer event to frontend
         try:
-            job_ctx = get_job_context()
-            room = job_ctx.room
-            
-            await room.local_participant.publish_data(
+            await context.room.local_participant.publish_data(
                 json.dumps({
                     "type": "transfer_request",
                     "reason": reason,
-                    "timestamp": asyncio.get_event_loop().time(),
+                    "timestamp": str(asyncio.get_event_loop().time())
                 }).encode("utf-8"),
                 reliable=True,
             )
         except Exception as e:
-            logger.warning(f"Failed to send transfer request: {e}")
+            logger.warning(f"Failed to publish transfer event: {e}")
         
-        return "I'm transferring you to a human agent now. Please hold for a moment."
+        return "I'm transferring your call to a human agent now. Please hold for a moment. They will be with you shortly."
 
 
-# Prewarm function for faster cold starts - CORRECTED: Now synchronous
 def prewarm(proc: JobProcess):
-    """Prewarm VAD and other models for faster startup"""
-    logger.info("🔥 Prewarming models...")
+    """Prewarm function to load models before first use"""
+    logger.info("🔄 Prewarming models...")
     proc.userdata["vad"] = silero.VAD.load()
-    logger.info("✓ VAD prewarmed")
+    logger.info("✓ VAD model prewarmed")
 
 
 async def entrypoint(ctx: JobContext):
@@ -262,16 +321,13 @@ async def entrypoint(ctx: JobContext):
     except Exception as e:
         logger.error(f"Error waiting for participant: {e}")
 
-    # Initialize the assistant
-    logger.info("🤖 Initializing EV Charging Assistant...")
-    assistant = EVChargingAssistant()
-
-    # Create the agent session with OPTIMIZED settings for low latency
-    logger.info("🎙️ Creating AgentSession with optimizations...")
+    # Create the agent session
+    logger.info("🎙️ Creating AgentSession...")
     session = AgentSession(
         stt=oai.STT(
             model=os.getenv("OPENAI_STT_MODEL", "gpt-4o-transcribe"),
             language="en",
+            use_realtime=True,
         ),
         llm=oai.LLM(
             model=os.getenv("OPENAI_LLM_MODEL", "gpt-4o-mini"),
@@ -284,10 +340,7 @@ async def entrypoint(ctx: JobContext):
         ),
         turn_detection="vad",
         vad=ctx.proc.userdata["vad"],
-        # LATENCY OPTIMIZATIONS
-        preemptive_generation=True,  # Start LLM before VAD confirms end of speech
-        min_endpointing_delay=0.3,   # Faster turn detection (reduced from 0.5s)
-        max_endpointing_delay=2.5,   # Reduced from 3.0s
+        preemptive_generation=False,  # Keep disabled for accurate RAG
     )
 
     # Set up metrics collection
@@ -304,10 +357,10 @@ async def entrypoint(ctx: JobContext):
 
     ctx.add_shutdown_callback(log_usage)
 
-    # Real-time transcription handling - USER INPUT STREAMING
+    # Real-time transcription handling
     @session.on("user_input_transcribed")
     def _on_user_input_transcribed(ev: voice_events.UserInputTranscribedEvent):
-        """Send real-time user transcriptions to frontend - both partial and final"""
+        """Send real-time transcriptions to frontend"""
         
         if ev.is_final:
             logger.info(f"💬 USER (final): '{ev.transcript}'")
@@ -325,7 +378,7 @@ async def entrypoint(ctx: JobContext):
                         "language": ev.language or "en",
                         "timestamp": asyncio.get_event_loop().time(),
                     }).encode("utf-8"),
-                    reliable=ev.is_final,  # Only guarantee delivery for final transcripts
+                    reliable=ev.is_final,
                 )
             except Exception as e:
                 logger.warning(f"❌ Failed to publish user transcript: {e}")
@@ -334,35 +387,37 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("user_speech_committed")
     def _on_user_speech_committed(speech_text: str):
+        """Called when user finishes speaking"""
         logger.info(f"✓ User speech committed: '{speech_text[:100]}...'")
 
     @session.on("agent_speech_started")
     def _on_agent_speech_started():
+        """Called when agent starts speaking"""
         logger.info("🗣️  Agent started speaking")
 
     @session.on("agent_speech_stopped") 
     def _on_agent_speech_stopped():
+        """Called when agent stops speaking"""
         logger.info("🛑 Agent stopped speaking")
 
-    # STREAMING ASSISTANT RESPONSES via conversation_item_added
-    # This fires when the LLM generates a response
+    # Handle assistant responses
     @session.on("conversation_item_added")
     def _on_conversation_item_added(ev: voice_events.ConversationItemAddedEvent):
-        """Stream assistant responses to frontend"""
+        """Send assistant responses to frontend"""
         item = ev.item
         
         if not isinstance(item, llm.ChatMessage) or item.role != "assistant":
             return
 
         text = item.text_content or ""
-        if not text or "Here is relevant information from our knowledge base" in text:
+        if not text or "RELEVANT INFORMATION FROM KNOWLEDGE BASE" in text:
+            # Skip internal context messages
             return
             
         logger.info(f"🤖 ASSISTANT: '{text}'")
         
         async def publish_assistant_response():
             try:
-                # Send as final message
                 await ctx.room.local_participant.publish_data(
                     json.dumps({
                         "type": "transcription",
@@ -379,7 +434,7 @@ async def entrypoint(ctx: JobContext):
         
         asyncio.create_task(publish_assistant_response())
 
-    # Track subscription
+    # Track subscription for debugging
     @ctx.room.on("track_subscribed")
     def on_track_subscribed(
         track: rtc.Track,
@@ -389,7 +444,11 @@ async def entrypoint(ctx: JobContext):
         if track.kind == rtc.TrackKind.KIND_AUDIO:
             logger.info(f"🎧 Audio track subscribed from {participant.identity}")
 
-    # Start the session with transcription enabled and unsynced for faster delivery
+    # Initialize the assistant with session and context
+    logger.info("🤖 Initializing EV Charging Assistant with OPTIMIZED RAG...")
+    assistant = EVChargingAssistant(session=session, job_context=ctx)
+
+    # Start the session
     logger.info("▶️  Starting AgentSession...")
     await session.start(
         agent=assistant,
@@ -397,32 +456,29 @@ async def entrypoint(ctx: JobContext):
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
         ),
-        room_output_options=RoomOutputOptions(
-            transcription_enabled=True,      # Enable transcription forwarding
-            sync_transcription=False,        # Don't sync to audio for faster delivery
-        ),
     )
 
-    # Initialize thinking sounds AFTER session starts
-    logger.info("🎵 Initializing background audio with thinking sounds...")
+    # Add background audio for thinking sounds
+    logger.info("🎵 Setting up background audio (thinking sounds)...")
     background_audio = BackgroundAudioPlayer(
-        # No ambient sound - just thinking sounds during tool calls
-        thinking_sound=AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING2, volume=0.4)
+        # Play subtle typing sound when agent is thinking/processing
+        thinking_sound=[
+            AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=0.3, probability=0.6),
+            AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING2, volume=0.25, probability=0.4),
+        ],
     )
-    
-    # Start the background audio player
     await background_audio.start(room=ctx.room, agent_session=session)
-    logger.info("✓ Background audio initialized - thinking sounds will play during tool calls")
+    logger.info("✓ Background audio started")
 
     logger.info("=" * 80)
     logger.info("✅ VOICE AGENT FULLY INITIALIZED - OPTIMIZED MODE")
     logger.info("=" * 80)
     logger.info("📋 Optimizations enabled:")
-    logger.info("   ✓ Preemptive generation (reduced latency)")
-    logger.info("   ✓ Faster turn detection (0.3s min delay)")
-    logger.info("   ✓ Unsynced transcriptions (faster delivery)")
-    logger.info("   ✓ Thinking sounds (during tool calls)")
-    logger.info("   ✓ Fixed RunContext issues")
+    logger.info("   ✓ on_user_turn_completed RAG (faster than function tools)")
+    logger.info("   ✓ Verbal status updates (500ms delay)")
+    logger.info("   ✓ Thinking sounds (subtle keyboard typing)")
+    logger.info("   ✓ UI status notifications")
+    logger.info("   ✓ Direct context injection (no extra LLM round trips)")
     logger.info("=" * 80)
 
 

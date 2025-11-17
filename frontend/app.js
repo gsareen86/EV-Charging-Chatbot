@@ -1,9 +1,11 @@
 /**
- * EV Charging Voice Assistant - FIXED & DEBUGGED VERSION
- * Issues Fixed:
- * 1. Live transcriptions now display correctly
- * 2. Speaking indicators work properly
- * 3. Auto-disconnect fixed with better keyword detection
+ * EV Charging Voice Assistant - STREAMING OPTIMIZED VERSION
+ * Features:
+ * 1. Real-time streaming transcriptions (partial + final) for both user and assistant
+ * 2. Speaking indicators
+ * 3. Inline status messages
+ * 4. Auto-disconnect functionality
+ * 5. Proper turn attribution for AI assistant messages
  */
 
 class EVChargingApp {
@@ -22,20 +24,23 @@ class EVChargingApp {
         this.currentSpeaker = null;
         this.speakingTimeout = null;
         
-        // Auto-disconnect keywords (more comprehensive)
+        // Track current status for inline display
+        this.currentStatusElement = null;
+        
+        // Auto-disconnect keywords
         this.goodbyeKeywords = [
             'goodbye', 'good bye', 'bye', 'by', 'thank you', 'thanks', 'thankyou',
             'thats all', 'that\'s all', 'nothing else', 'no more', 'all done',
             'im done', 'i\'m done', 'done', 'ok bye', 'okay bye',
-            'धन्यवाद', 'शुक्रिया', 'अलविदा', 'धन्यवाद'
+            'धन्यवाद', 'शुक्रिया', 'अलविदा'
         ];
 
         this.initializeElements();
         this.attachEventListeners();
         this.loadThemePreference();
         
-        console.log('🚀 EV Charging App initialized - DEBUG MODE');
-        console.log('📋 Auto-disconnect keywords:', this.goodbyeKeywords);
+        console.log('🚀 EV Charging App initialized - STREAMING OPTIMIZED MODE');
+        console.log('✨ New features: Real-time streaming for user & assistant');
     }
 
     initializeElements() {
@@ -170,7 +175,6 @@ class EVChargingApp {
             this.muteBtn.disabled = false;
 
             console.log('✅ Ready to interact!');
-            console.log('🎤 Speak into your microphone to test...');
 
         } catch (error) {
             console.error('❌ Connection error:', error);
@@ -202,7 +206,7 @@ class EVChargingApp {
     }
 
     /* ====================================
-       ROOM EVENT LISTENERS - FIXED!
+       ROOM EVENT LISTENERS
        ==================================== */
 
     setupRoomEventListeners() {
@@ -218,8 +222,7 @@ class EVChargingApp {
                 document.body.appendChild(audioElement);
                 console.log('✓ Agent audio element attached and playing');
                 
-                // Show speaking indicator when agent audio plays
-                this.showSpeakingIndicator('assistant', 2000); // Show for 2 seconds
+                this.showSpeakingIndicator('assistant', 2000);
             }
         });
 
@@ -229,7 +232,7 @@ class EVChargingApp {
             track.detach().forEach(element => element.remove());
         });
 
-        // DATA RECEIVED - This is critical for transcriptions!
+        // DATA RECEIVED - Handle transcriptions and status updates
         this.room.on(LivekitClient.RoomEvent.DataReceived, (payload, participant) => {
             try {
                 const decoder = new TextDecoder();
@@ -238,14 +241,15 @@ class EVChargingApp {
                 
                 console.log('📦 DATA RECEIVED:', {
                     type: data.type,
-                    role: data.role,
-                    text: data.text?.substring(0, 50) + '...',
+                    role: data.role || data.status_type,
                     isFinal: data.isFinal,
-                    fullData: data
+                    preview: (data.text || data.status || '').substring(0, 50),
                 });
 
                 if (data.type === 'transcription') {
                     this.handleTranscription(data);
+                } else if (data.type === 'status_update') {
+                    this.handleStatusUpdate(data);
                 } else if (data.type === 'transfer_request') {
                     this.handleTransferRequest(data);
                 } else {
@@ -270,23 +274,83 @@ class EVChargingApp {
     }
 
     /* ====================================
-       TRANSCRIPTION HANDLING - FIXED!
+       STATUS MESSAGE HANDLING (IMPROVED - INLINE STYLE)
+       ==================================== */
+
+    handleStatusUpdate(data) {
+        const { status, status_type } = data;
+        
+        console.log(`📢 STATUS UPDATE: "${status}" (type: ${status_type})`);
+        
+        // Show status message inline with assistant messages
+        this.showInlineStatus(status, status_type);
+    }
+
+    showInlineStatus(message, type = 'searching') {
+        // Remove existing status if any
+        if (this.currentStatusElement) {
+            this.currentStatusElement.remove();
+            this.currentStatusElement = null;
+        }
+
+        // Don't show "Search complete" messages
+        if (type === 'complete') {
+            return;
+        }
+
+        // Create inline status element (simple glowing text)
+        const statusSpan = document.createElement('span');
+        statusSpan.className = `inline-status inline-status-${type}`;
+        
+        // Set icon based on type
+        let icon = '🔍';
+        if (type === 'searching') {
+            icon = '🔍';
+        } else if (type === 'synthesizing') {
+            icon = '🎤';
+        } else if (type === 'error') {
+            icon = '⚠️';
+        }
+
+        statusSpan.textContent = `${icon} ${message}`;
+        
+        // Store reference
+        this.currentStatusElement = statusSpan;
+
+        // Append to transcription content (will be moved to assistant message later)
+        this.transcriptionContent.appendChild(statusSpan);
+        this.transcriptionContent.scrollTop = this.transcriptionContent.scrollHeight;
+
+        console.log(`✨ Inline status displayed: "${message}"`);
+    }
+
+    hideInlineStatus() {
+        if (this.currentStatusElement) {
+            this.currentStatusElement.classList.add('fade-out');
+            setTimeout(() => {
+                if (this.currentStatusElement && this.currentStatusElement.parentNode) {
+                    this.currentStatusElement.remove();
+                }
+                this.currentStatusElement = null;
+            }, 300);
+        }
+    }
+
+    /* ====================================
+       TRANSCRIPTION HANDLING - WITH STREAMING SUPPORT
        ==================================== */
 
     handleTranscription(data) {
         const { role, text, isFinal, language } = data;
         
-        // DEBUG: Log everything
         console.log(`\n${'='.repeat(60)}`);
         console.log(`📝 TRANSCRIPTION RECEIVED:`);
         console.log(`   Role: ${role}`);
         console.log(`   Text: "${text}"`);
         console.log(`   Final: ${isFinal}`);
-        console.log(`   Language: ${language}`);
         console.log(`${'='.repeat(60)}\n`);
         
         if (!text || text.trim() === '') {
-            console.log('⚠️ Empty text, skipping...');
             return;
         }
 
@@ -296,22 +360,28 @@ class EVChargingApp {
         // Remove empty state if present
         const emptyState = this.transcriptionContent.querySelector('.empty-state');
         if (emptyState) {
-            console.log('🗑️ Removing empty state');
             emptyState.remove();
         }
 
-        // Show speaking indicator based on role and finality
+        // Show speaking indicator
         if (role === 'user') {
             if (!isFinal) {
-                this.showSpeakingIndicator('user', null); // Show until final
+                this.showSpeakingIndicator('user', null);
             } else {
-                this.hideSpeakingIndicator(); // Hide when user done
+                this.hideSpeakingIndicator();
             }
-        } else if (role === 'assistant' && isFinal) {
-            this.showSpeakingIndicator('assistant', 3000); // Show for 3 seconds
+        } else if (role === 'assistant') {
+            if (!isFinal) {
+                this.showSpeakingIndicator('assistant', null);
+            } else {
+                // Hide status when assistant final response arrives
+                this.hideInlineStatus();
+                // Keep speaking indicator for a bit longer
+                this.showSpeakingIndicator('assistant', 2000);
+            }
         }
 
-        // Handle transcripts
+        // Handle transcripts with streaming support
         if (role === 'user') {
             this.handleUserTranscript(text, isFinal, language);
         } else if (role === 'assistant') {
@@ -326,22 +396,18 @@ class EVChargingApp {
         console.log(`👤 USER TRANSCRIPT: isFinal=${isFinal}`);
         
         if (!isFinal) {
-            // Handle partial transcript
+            // Handle partial transcriptions - UPDATE EXISTING OR CREATE NEW
             if (this.currentUserPartial) {
-                // Update existing partial message
                 const messageText = this.currentUserPartial.querySelector('.message-text');
                 messageText.textContent = text;
-                console.log('   ↻ Updated partial message');
             } else {
-                // Create new partial message
                 this.currentUserPartial = this.createTranscriptMessage('user', text, language, false);
                 this.transcriptionContent.appendChild(this.currentUserPartial);
-                console.log('   + Created new partial message');
             }
         } else {
-            // Final transcript
+            // Handle final transcription
             if (this.currentUserPartial) {
-                // Finalize existing partial
+                // Update existing partial to final
                 const messageText = this.currentUserPartial.querySelector('.message-text');
                 messageText.textContent = text;
                 messageText.classList.remove('partial');
@@ -350,31 +416,69 @@ class EVChargingApp {
                 messageTime.textContent = this.getCurrentTimeString();
                 
                 this.currentUserPartial.dataset.final = 'true';
-                console.log('   ✓ Finalized partial message');
                 this.currentUserPartial = null;
             } else {
                 // Create new final message
                 const message = this.createTranscriptMessage('user', text, language, true);
                 this.transcriptionContent.appendChild(message);
-                console.log('   + Created new final message');
             }
             
-            // Check for goodbye intent
-            console.log('🔍 Checking for goodbye intent...');
             this.checkGoodbyeIntent(text);
         }
     }
 
     handleAssistantTranscript(text, isFinal, language) {
-        console.log(`🤖 ASSISTANT TRANSCRIPT: isFinal=${isFinal}`);
+        console.log(`🤖 ASSISTANT TRANSCRIPT: isFinal=${isFinal}, partialExists=${!!this.currentAssistantPartial}`);
         
-        if (isFinal) {
-            // Create new final message
-            const message = this.createTranscriptMessage('assistant', text, language, true);
-            this.transcriptionContent.appendChild(message);
-            console.log('   + Created assistant message');
-            
-            this.currentAssistantPartial = null;
+        if (!isFinal) {
+            // Handle STREAMING partial transcriptions from agent_speech event
+            if (this.currentAssistantPartial) {
+                // Update existing partial message
+                const messageText = this.currentAssistantPartial.querySelector('.message-text');
+                messageText.textContent = text;
+                console.log(`   ↻ Updated partial assistant message: "${text.substring(0, 50)}..."`);
+            } else {
+                // Create new partial message
+                this.currentAssistantPartial = this.createTranscriptMessage('assistant', text, language, false);
+                
+                // If there's a status element, move it into this message
+                if (this.currentStatusElement && this.currentStatusElement.parentNode) {
+                    const messageContent = this.currentAssistantPartial.querySelector('.message-content');
+                    // Insert status before the message text
+                    messageContent.insertBefore(this.currentStatusElement, messageContent.querySelector('.message-text'));
+                }
+                
+                this.transcriptionContent.appendChild(this.currentAssistantPartial);
+                console.log(`   ✚ Created new partial assistant message: "${text.substring(0, 50)}..."`);
+            }
+        } else {
+            // Handle final transcription
+            if (this.currentAssistantPartial) {
+                // Update existing partial to final
+                const messageText = this.currentAssistantPartial.querySelector('.message-text');
+                messageText.textContent = text;
+                messageText.classList.remove('partial');
+                
+                const messageTime = this.currentAssistantPartial.querySelector('.message-time');
+                messageTime.textContent = this.getCurrentTimeString();
+                
+                this.currentAssistantPartial.dataset.final = 'true';
+                this.currentAssistantPartial = null;
+                console.log(`   ✓ Finalized assistant message: "${text.substring(0, 50)}..."`);
+            } else {
+                // Create new final message (fallback)
+                const message = this.createTranscriptMessage('assistant', text, language, true);
+                
+                // If there's a status element, move it into this message
+                if (this.currentStatusElement && this.currentStatusElement.parentNode) {
+                    const messageContent = message.querySelector('.message-content');
+                    messageContent.insertBefore(this.currentStatusElement, messageContent.querySelector('.message-text'));
+                    this.currentStatusElement = null;
+                }
+                
+                this.transcriptionContent.appendChild(message);
+                console.log(`   ✚ Created new final assistant message: "${text.substring(0, 50)}..."`);
+            }
         }
     }
 
@@ -405,14 +509,13 @@ class EVChargingApp {
     }
 
     /* ====================================
-       SPEAKING INDICATOR - FIXED!
+       SPEAKING INDICATOR
        ==================================== */
 
     showSpeakingIndicator(speaker, duration) {
-        console.log(`🌊 Showing speaking indicator for: ${speaker}, duration: ${duration}ms`);
+        console.log(`🗣️  Showing speaking indicator for: ${speaker}`);
         
         this.currentSpeaker = speaker;
-        this.speakingIndicator.classList.add('active');
         
         if (speaker === 'user') {
             this.speakerAvatar.textContent = '👤';
@@ -421,13 +524,13 @@ class EVChargingApp {
             this.speakerAvatar.textContent = '🤖';
             this.speakerName.textContent = 'AI Assistant';
         }
-
-        // Clear any existing timeout
+        
+        this.speakingIndicator.classList.add('active');
+        
         if (this.speakingTimeout) {
             clearTimeout(this.speakingTimeout);
         }
-
-        // Auto-hide after duration (if specified)
+        
         if (duration) {
             this.speakingTimeout = setTimeout(() => {
                 this.hideSpeakingIndicator();
@@ -436,7 +539,7 @@ class EVChargingApp {
     }
 
     hideSpeakingIndicator() {
-        console.log('🔇 Hiding speaking indicator');
+        console.log('🛑 Hiding speaking indicator');
         this.speakingIndicator.classList.remove('active');
         this.currentSpeaker = null;
         
@@ -447,72 +550,37 @@ class EVChargingApp {
     }
 
     /* ====================================
-       AUTO-DISCONNECT - FIXED!
+       AUTO-DISCONNECT
        ==================================== */
 
     checkGoodbyeIntent(text) {
-        const lowerText = text.toLowerCase().trim();
+        const normalizedText = text.toLowerCase().trim();
+        console.log(`🔍 Checking for goodbye in: "${normalizedText}"`);
         
-        console.log(`\n${'='.repeat(60)}`);
-        console.log(`🔍 CHECKING GOODBYE INTENT`);
-        console.log(`   User said: "${text}"`);
-        console.log(`   Normalized: "${lowerText}"`);
-        
-        // Check each keyword
-        let matchedKeyword = null;
-        for (const keyword of this.goodbyeKeywords) {
-            if (lowerText.includes(keyword.toLowerCase())) {
-                matchedKeyword = keyword;
-                break;
+        const hasGoodbye = this.goodbyeKeywords.some(keyword => {
+            const hasMatch = normalizedText.includes(keyword);
+            if (hasMatch) {
+                console.log(`   ✓ Match found: "${keyword}"`);
             }
-        }
+            return hasMatch;
+        });
         
-        if (matchedKeyword) {
-            console.log(`   ✅ MATCH FOUND: "${matchedKeyword}"`);
-            console.log(`   👋 Initiating auto-disconnect...`);
-            console.log(`${'='.repeat(60)}\n`);
+        if (hasGoodbye) {
+            console.log('👋 GOODBYE DETECTED! Auto-disconnecting in 3 seconds...');
+            this.showAutoDisconnectToast();
             
-            // Show farewell message
-            this.showFarewellMessage();
-            
-            // Disconnect after delay
             setTimeout(() => {
-                console.log('📞 Auto-disconnecting now...');
                 this.disconnect(true);
             }, 3000);
-        } else {
-            console.log(`   ❌ No goodbye keywords detected`);
-            console.log(`${'='.repeat(60)}\n`);
         }
     }
 
-    showFarewellMessage() {
-        console.log('👋 Showing farewell message');
-        
-        // Show toast notification
-        const toastText = this.autoDisconnectToast.querySelector('.toast-text p');
-        toastText.textContent = 'You were talking to "AI Assistant". Have a great day!';
-        
+    showAutoDisconnectToast() {
         this.autoDisconnectToast.classList.add('show');
         
-        // Hide after 5 seconds
         setTimeout(() => {
             this.autoDisconnectToast.classList.remove('show');
-        }, 5000);
-
-        // Add to transcription
-        const farewellDiv = document.createElement('div');
-        farewellDiv.className = 'transfer-notification';
-        farewellDiv.innerHTML = `
-            <div class="transfer-icon">👋</div>
-            <div class="transfer-text">
-                <strong>Call Ending</strong>
-                <p>Thank you for using our service! The call will disconnect shortly.</p>
-            </div>
-        `;
-        
-        this.transcriptionContent.appendChild(farewellDiv);
-        this.transcriptionContent.scrollTop = this.transcriptionContent.scrollHeight;
+        }, 3500);
     }
 
     /* ====================================
@@ -520,7 +588,7 @@ class EVChargingApp {
        ==================================== */
 
     handleTransferRequest(data) {
-        console.log('📞 Transfer request:', data.reason);
+        console.log('📞 Transfer request received:', data.reason);
         
         const notification = document.createElement('div');
         notification.className = 'transfer-notification';
@@ -606,6 +674,7 @@ class EVChargingApp {
         this.currentSpeaker = null;
         
         this.hideSpeakingIndicator();
+        this.hideInlineStatus();
         
         console.log('✓ Disconnected and cleaned up');
     }
@@ -690,6 +759,8 @@ class EVChargingApp {
             this.transcripts = [];
             this.currentUserPartial = null;
             this.currentAssistantPartial = null;
+            this.hideInlineStatus();
+            
             this.transcriptionContent.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon">💬</div>
@@ -708,13 +779,14 @@ class EVChargingApp {
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('='.repeat(80));
-    console.log('EV CHARGING VOICE ASSISTANT - FIXED & DEBUGGED VERSION');
+    console.log('EV CHARGING VOICE ASSISTANT - STREAMING OPTIMIZED');
     console.log('='.repeat(80));
     console.log('');
-    console.log('🐛 DEBUG MODE ENABLED');
-    console.log('   - Detailed logging for transcriptions');
-    console.log('   - Speaking indicator debugging');
-    console.log('   - Auto-disconnect keyword matching');
+    console.log('✨ IMPROVEMENTS:');
+    console.log('   - Real-time streaming transcriptions (partial + final)');
+    console.log('   - Both user and assistant messages stream');
+    console.log('   - Inline status messages');
+    console.log('   - Fixed turn attribution');
     console.log('');
     
     if (typeof LivekitClient === 'undefined') {
@@ -724,19 +796,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     console.log('✓ LivekitClient loaded successfully');
-    console.log('  Available:', Object.keys(LivekitClient).slice(0, 5).join(', '), '...');
     console.log('');
     
     window.app = new EVChargingApp();
     
     console.log('✓ App initialized and ready');
-    console.log('');
-    console.log('📝 TROUBLESHOOTING TIPS:');
-    console.log('   1. Connect to the room');
-    console.log('   2. Speak into your microphone');
-    console.log('   3. Watch console for "📦 DATA RECEIVED" messages');
-    console.log('   4. If no data received, check backend is running');
-    console.log('   5. Say "goodbye" or "thank you" to test auto-disconnect');
-    console.log('');
     console.log('='.repeat(80));
 });
