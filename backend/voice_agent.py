@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 import logging
+import time
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -160,7 +161,7 @@ class EVChargingAssistant(Agent):
                     "type": "status_update",
                     "status": "Searching knowledge base...",
                     "status_type": "searching",
-                    "timestamp": asyncio.get_event_loop().time(),
+                    "timestamp": time.time(),
                 }).encode("utf-8"),
                 reliable=True,
             )
@@ -185,7 +186,7 @@ class EVChargingAssistant(Agent):
                         "type": "status_update",
                         "status": "Search complete",
                         "status_type": "complete",
-                        "timestamp": asyncio.get_event_loop().time(),
+                        "timestamp": time.time(),
                     }).encode("utf-8"),
                     reliable=True,
                 )
@@ -220,7 +221,7 @@ class EVChargingAssistant(Agent):
                 json.dumps({
                     "type": "transfer_request",
                     "reason": reason,
-                    "timestamp": asyncio.get_event_loop().time(),
+                    "timestamp": time.time(),
                 }).encode("utf-8"),
                 reliable=True,
             )
@@ -323,7 +324,7 @@ async def entrypoint(ctx: JobContext):
                         "text": ev.transcript,
                         "isFinal": ev.is_final,
                         "language": ev.language or "en",
-                        "timestamp": asyncio.get_event_loop().time(),
+                        "timestamp": time.time(),
                     }).encode("utf-8"),
                     reliable=ev.is_final,  # Only guarantee delivery for final transcripts
                 )
@@ -370,7 +371,7 @@ async def entrypoint(ctx: JobContext):
                         "text": text,
                         "isFinal": True,
                         "language": "en",
-                        "timestamp": asyncio.get_event_loop().time(),
+                        "timestamp": time.time(),
                     }).encode("utf-8"),
                     reliable=True,
                 )

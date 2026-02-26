@@ -2,6 +2,7 @@
 Script to build FAISS vector database from FAQ data
 """
 import json
+import logging
 import os
 import pickle
 from pathlib import Path
@@ -13,6 +14,9 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+logger = logging.getLogger("ev-charging-vector-db-builder")
+logging.basicConfig(level=logging.INFO)
 
 class VectorDBBuilder:
     """Build and manage FAISS vector database for FAQ retrieval"""
@@ -36,7 +40,7 @@ class VectorDBBuilder:
         with open(faq_file, 'r', encoding='utf-8') as f:
             faqs = json.load(f)
 
-        print(f"Loaded {len(faqs)} FAQs")
+        logger.info("Loaded %d FAQs", len(faqs))
 
         # Prepare data structures
         embeddings_list = []
@@ -68,14 +72,15 @@ class VectorDBBuilder:
                 'answer': faq['answer_hi']
             })
 
-            print(f"Processed FAQ {idx + 1}/{len(faqs)}")
-
-        # Convert to numpy array
-        embeddings_array = np.array(embeddings_list).astype('float32')
+            logger.info("Processed FAQ %d/%d", idx + 1, len(faqs))
 
         # Create FAISS index
         index = faiss.IndexFlatL2(self.dimension)
-        index.add(embeddings_array)
+
+        # Add embeddings if any were generated
+        if embeddings_list:
+            embeddings_array = np.array(embeddings_list).astype('float32')
+            index.add(embeddings_array)
 
         # Create output directory
         Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -88,10 +93,10 @@ class VectorDBBuilder:
         with open(metadata_path, 'wb') as f:
             pickle.dump(metadata_list, f)
 
-        print(f"\nVector database built successfully!")
-        print(f"Index saved to: {index_path}")
-        print(f"Metadata saved to: {metadata_path}")
-        print(f"Total vectors: {index.ntotal}")
+        logger.info("Vector database built successfully!")
+        logger.info("Index saved to: %s", index_path)
+        logger.info("Metadata saved to: %s", metadata_path)
+        logger.info("Total vectors: %d", index.ntotal)
 
 def main():
     """Main function to build vector database"""

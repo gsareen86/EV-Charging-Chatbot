@@ -1,16 +1,23 @@
 """
 Vector search utility for FAQ retrieval using FAISS
 """
+import logging
 import os
 import pickle
+from collections import OrderedDict
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict
 import numpy as np
 import faiss
 from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger("ev-charging-vector-search")
+
+_EMBEDDING_CACHE_MAX_SIZE = 256
+
 
 class VectorSearch:
     """Handle vector similarity search for FAQ retrieval"""
@@ -23,6 +30,7 @@ class VectorSearch:
 
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.embedding_model = embedding_model
+        self._embedding_cache: OrderedDict[str, np.ndarray] = OrderedDict()
 
         # Load FAISS index
         index_path = os.path.join(index_dir, 'faqs.index')
@@ -36,16 +44,25 @@ class VectorSearch:
         with open(metadata_path, 'rb') as f:
             self.metadata = pickle.load(f)
 
-        print(f"Loaded FAISS index with {self.index.ntotal} vectors")
+        logger.info("Loaded FAISS index with %d vectors", self.index.ntotal)
 
     def get_embedding(self, text: str) -> np.ndarray:
-        """Get embedding for query text"""
+        """Get embedding for query text, with LRU caching to reduce API calls."""
+        if text in self._embedding_cache:
+            self._embedding_cache.move_to_end(text)
+            return self._embedding_cache[text]
+
         response = self.client.embeddings.create(
             model=self.embedding_model,
             input=text
         )
-        embedding = np.array(response.data[0].embedding).astype('float32')
-        return embedding.reshape(1, -1)
+        embedding = np.array(response.data[0].embedding).astype('float32').reshape(1, -1)
+
+        self._embedding_cache[text] = embedding
+        while len(self._embedding_cache) > _EMBEDDING_CACHE_MAX_SIZE:
+            self._embedding_cache.popitem(last=False)
+
+        return embedding
 
     def search(self, query: str, language: str = 'en', top_k: int = 3) -> List[Dict]:
         """

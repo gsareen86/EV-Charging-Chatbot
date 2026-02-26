@@ -207,3 +207,10 @@ marimo/_lsp/
 __marimo__/
 node_modules/
 package-lock.json
+
+# Backup files
+*.backup
+*.working_backup
+
+# Project virtual environment
+ev_charging_venv/
