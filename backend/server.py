@@ -5,13 +5,16 @@ Handles token generation and serves the frontend
 import json
 import logging
 import os
+import re
+import time
+from collections import OrderedDict
 from pathlib import Path
-from typing import List, Set
+from typing import List
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from livekit import api
 from livekit.api import LiveKitAPI
 from livekit.api.twirp_client import TwirpError, TwirpErrorCode
@@ -46,7 +49,35 @@ else:
     LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "secret")
 
 
-_dispatch_cache: Set[str] = set()
+_DISPATCH_CACHE_MAX_SIZE = 1000
+_DISPATCH_CACHE_TTL = 3600  # 1 hour
+_dispatch_cache: OrderedDict[str, float] = OrderedDict()
+
+
+def _cache_room(room_name: str) -> None:
+    """Add a room to the dispatch cache with TTL eviction."""
+    now = time.monotonic()
+    # Evict expired entries
+    while _dispatch_cache:
+        oldest_key, oldest_time = next(iter(_dispatch_cache.items()))
+        if now - oldest_time > _DISPATCH_CACHE_TTL:
+            _dispatch_cache.pop(oldest_key)
+        else:
+            break
+    # Evict oldest if at capacity
+    while len(_dispatch_cache) >= _DISPATCH_CACHE_MAX_SIZE:
+        _dispatch_cache.popitem(last=False)
+    _dispatch_cache[room_name] = now
+
+
+def _is_room_cached(room_name: str) -> bool:
+    """Check if a room is in the dispatch cache and not expired."""
+    if room_name not in _dispatch_cache:
+        return False
+    if time.monotonic() - _dispatch_cache[room_name] > _DISPATCH_CACHE_TTL:
+        _dispatch_cache.pop(room_name)
+        return False
+    return True
 
 
 async def _ensure_room_exists(lk_api: LiveKitAPI, room_name: str) -> None:
@@ -69,7 +100,7 @@ async def ensure_agent_dispatch(room_name: str) -> None:
         logger.debug("LIVEKIT_AGENT_NAME is empty, skipping dispatch request")
         return
 
-    if room_name in _dispatch_cache:
+    if _is_room_cached(room_name):
         return
 
     try:
@@ -91,7 +122,7 @@ async def ensure_agent_dispatch(room_name: str) -> None:
                     raise
             for dispatch in existing_dispatches:
                 if dispatch.agent_name == LIVEKIT_AGENT_NAME:
-                    _dispatch_cache.add(room_name)
+                    _cache_room(room_name)
                     logger.debug(
                         "Found existing agent dispatch for %s in room %s",
                         LIVEKIT_AGENT_NAME,
@@ -123,7 +154,7 @@ async def ensure_agent_dispatch(room_name: str) -> None:
                 else:
                     raise
 
-            _dispatch_cache.add(room_name)
+            _cache_room(room_name)
             logger.info(
                 "Created LiveKit agent dispatch for %s in room %s",
                 LIVEKIT_AGENT_NAME,
@@ -132,7 +163,7 @@ async def ensure_agent_dispatch(room_name: str) -> None:
 
     except TwirpError as error:
         if error.code == TwirpErrorCode.ALREADY_EXISTS:
-            _dispatch_cache.add(room_name)
+            _cache_room(room_name)
             logger.debug(
                 "Agent dispatch already exists for %s in room %s",
                 LIVEKIT_AGENT_NAME,
@@ -155,23 +186,40 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS
+# Configure CORS - restrict origins via ALLOWED_ORIGINS env var (comma-separated)
+_allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
+    allow_origins=[origin.strip() for origin in _allowed_origins],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 # Get frontend directory
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 
+# Input validation pattern: alphanumeric, hyphens, underscores only
+_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
 # Pydantic models for request/response validation
 class TokenRequest(BaseModel):
     roomName: str
     participantName: str
+
+    @field_validator("roomName", "participantName")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("must not be empty")
+        if len(v) > 64:
+            raise ValueError("must be 64 characters or fewer")
+        if not _NAME_PATTERN.match(v):
+            raise ValueError("must contain only alphanumeric characters, hyphens, and underscores")
+        return v
 
 
 class TokenResponse(BaseModel):
@@ -228,8 +276,11 @@ async def generate_token(request: TokenRequest):
             participantName=request.participantName
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Token generation failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -270,7 +321,11 @@ async def read_index():
 @app.get("/{file_path:path}")
 async def serve_static(file_path: str):
     """Serve static files (CSS, JS, etc.)"""
-    file_location = FRONTEND_DIR / file_path
+    file_location = (FRONTEND_DIR / file_path).resolve()
+
+    # Prevent path traversal attacks
+    if not file_location.is_relative_to(FRONTEND_DIR.resolve()):
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     if file_location.exists() and file_location.is_file():
         return FileResponse(
@@ -305,6 +360,6 @@ if __name__ == "__main__":
         "server:app",
         host="0.0.0.0",
         port=5000,
-        reload=True,  # Auto-reload on code changes
+        reload=os.getenv("RELOAD", "false").lower() == "true",
         log_level="info"
     )
